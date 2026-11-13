@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daggerheart 擲骰器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  h1 {
+    text-align: center;
+    color: #c9a84c;
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+  }
+
+  /* 分頁 */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 4px;
+    background: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    color: #888;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .tab-btn.active {
+    background: #c9a84c;
+    color: #1a1a2e;
+    font-weight: bold;
+    border-color: #c9a84c;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* 卡片 */
+  .card {
+    background: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .card h2 {
+    color: #c9a84c;
+    font-size: 0.88rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #2a2a4a;
+    padding-bottom: 6px;
+  }
+
+  /* 表單 */
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 0.75rem; color: #aaa; }
+  .field input, .field select {
+    background: #0f0f23;
+    border: 1px solid #3a3a5a;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 6px 10px;
+    font-size: 0.88rem;
+  }
+  .field input:focus, .field select:focus {
+    outline: none; border-color: #c9a84c;
+  }
+  .w50 { width: 50px; }
+  .w70 { width: 70px; }
+  .w90 { width: 90px; }
+  .w120 { width: 120px; }
+
+  /* 屬性格 */
+  .attr-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .attr-item {
+    background: #0f0f23;
+    border: 1px solid #3a3a5a;
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .attr-item.selected {
+    border-color: #c9a84c;
+    background: #1e1a0e;
+  }
+  .attr-item .attr-name { font-size: 0.72rem; color: #aaa; }
+  .attr-item .attr-val {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #c9a84c;
+  }
+
+  /* 切換開關 */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0f0f23;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .toggle-row:hover { border-color: #3a3a5a; }
+  .toggle-row.checked { border-color: #c9a84c; background: #1e1a0e; }
+  .toggle-row .toggle-label { font-size: 0.88rem; }
+  .toggle-row .toggle-badge {
+    font-size: 0.78rem;
+    color: #c9a84c;
+    font-family: monospace;
+    background: #2a2210;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .toggle-row .toggle-note {
+    font-size: 0.72rem;
+    color: #666;
+    margin-top: 2px;
+  }
+  .toggle-row input[type="checkbox"] { display: none; }
+
+  /* 領域卡 */
+  .domain-card-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #0f0f23;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .domain-card-row:hover { border-color: #3a3a5a; }
+  .domain-card-row.checked { border-color: #c9a84c; background: #1e1a0e; }
+  .domain-card-row input[type="checkbox"] { display: none; }
+  .domain-card-info { flex: 1; }
+  .domain-card-name { font-size: 0.88rem; }
+  .domain-card-type {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 2px;
+  }
+  .domain-card-dice {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #c9a84c;
+    background: #2a2210;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .domain-card-complex {
+    font-size: 0.72rem;
+    color: #f0a030;
+    background: #2a1e00;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .add-card-btn {
+    width: 100%;
+    background: none;
+    border: 1px dashed #3a3a5a;
+    color: #888;
+    border-radius: 6px;
+    padding: 7px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    margin-top: 4px;
+    transition: all 0.2s;
+  }
+  .add-card-btn:hover { border-color: #c9a84c; color: #c9a84c; }
+
+  /* 經歷 */
+  .exp-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #0f0f23;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .exp-row:hover { border-color: #3a3a5a; }
+  .exp-row.checked { border-color: #c9a84c; background: #1e1a0e; }
+  .exp-row input[type="checkbox"] { display: none; }
+  .exp-name { flex: 1; font-size: 0.88rem; }
+  .exp-val {
+    font-family: monospace;
+    font-size: 0.88rem;
+    color: #c9a84c;
+    background: #2a2210;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* 公式預覽 */
+  .formula-preview {
+    background: #0f0f23;
+    border: 1px solid #3a3a5a;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: monospace;
+    font-size: 1rem;
+    color: #c9a84c;
+    text-align: center;
+    min-height: 40px;
+    letter-spacing: 1px;
+  }
+
+  /* 擲骰按鈕 */
+  .roll-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #c9a84c, #a07830);
+    border: none;
+    border-radius: 10px;
+    color: #1a1a2e;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all 0.2s;
+    margin-top: 4px;
+  }
+  .roll-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(201,168,76,0.4); }
+  .roll-btn:active { transform: translateY(0); }
+
+  /* 結果 */
+  .result-area {
+    display: none;
+    background: #0f0f23;
+    border: 2px solid #c9a84c;
+    border-radius: 12px;
+    padding: 18px;
+    text-align: center;
+    margin-top: 14px;
+  }
+  .result-area.show { display: block; }
+  .result-formula { font-size: 0.78rem; color: #888; margin-bottom: 8px; font-family: monospace; }
+  .result-breakdown {
+    font-size: 0.85rem;
+    color: #aaa;
+    margin-bottom: 12px;
+    font-family: monospace;
+    line-height: 1.8;
+    text-align: left;
+    display: inline-block;
+  }
+  .result-total {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #c9a84c;
+    line-height: 1;
+  }
+  .result-label { font-size: 0.78rem; color: #888; margin-top: 4px; }
+
+  /* 希望/恐懼結果 */
+  .dh-result-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .dh-result-box {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .dh-result-box .box-label { font-size: 0.72rem; color: #aaa; margin-bottom: 4px; }
+  .dh-result-box .box-val { font-size: 2rem; font-weight: bold; }
+  .hope-box { background: #1a2e1a; border: 1px solid #4caf50; }
+  .hope-box .box-val { color: #4caf50; }
+  .fear-box { background: #2e1a1a; border: 1px solid #f44336; }
+  .fear-box .box-val { color: #f44336; }
+  .dh-verdict {
+    font-size: 0.95rem;
+    font-weight: bold;
+    padding: 8px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .verdict-hope { background: #1a2e1a; color: #4caf50; }
+  .verdict-fear { background: #2e1a1a; color: #f44336; }
+  .verdict-crit { background: #2e2a1a; color: #c9a84c; }
+
+  /* 小提示 */
+  .hint {
+    font-size: 0.75rem;
+    color: #666;
+    text-align: center;
+    margin-top: 6px;
+  }
+  .complex-warning {
+    background: #2a1e00;
+    border: 1px solid #f0a030;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    color: #f0a030;
+    margin-top: 8px;
+    display: none;
+  }
+  .complex-warning.show { display: block; }
+</style>
+</head>
+<body>
+
+<h1>⚔ DAGGERHEART</h1>
+<p class="subtitle">擲骰器 · Dice Roller</p>
+
+<!-- 分頁 -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('action')">⚡ 動作檢定</button>
+  <button class="tab-btn" onclick="switchTab('reaction')">🛡 反應檢定</button>
+  <button class="tab-btn" onclick="switchTab('damage')">⚔ 傷害計算</button>
+</div>
+
+<!-- ===== 動作檢定 ===== -->
+<div class="tab-panel active" id="tab-action">
+
+  <div class="card">
+    <h2>使用屬性（點選）</h2>
+    <div class="attr-grid" id="action-attrs">
+      <div class="attr-item" onclick="selectAttr('action',this,1)" data-val="1">
+        <div class="attr-name">敏捷</div>
+        <div class="attr-val" id="action-agi">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('action',this,1)" data-val="1">
+        <div class="attr-name">力量</div>
+        <div class="attr-val" id="action-str">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('action',this,1)" data-val="1">
+        <div class="attr-name">技巧</div>
+        <div class="attr-val" id="action-fin">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('action',this,1)" data-val="1">
+        <div class="attr-name">直覺</div>
+        <div class="attr-val" id="action-ins">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('action',this,1)" data-val="1">
+        <div class="attr-name">風采</div>
+        <div class="attr-val" id="action-pre">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('action',this,1)" data-val="1">
+        <div class="attr-name">知識</div>
+        <div class="attr-val" id="action-kno">1</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>加值選項</h2>
+
+    <!-- 優勢 -->
+    <div class="toggle-row" id="action-adv-row" onclick="toggleRow(this,'action-formula')">
+      <div>
+        <div class="toggle-label">優勢（Advantage）</div>
+        <div class="toggle-note">額外擲 +1d6</div>
+      </div>
+      <span class="toggle-badge">+1d6</span>
+      <input type="checkbox" id="action-adv">
+    </div>
+
+    <!-- 經歷 -->
+    <div id="action-experiences">
+      <div class="exp-row" onclick="toggleExpRow(this,'action-formula')">
+        <input type="checkbox">
+        <span class="exp-name"><input type="text" value="盜賊技巧" placeholder="經歷名稱" style="background:transparent;border:none;color:#e0e0e0;width:120px;" onclick="event.stopPropagation()"></span>
+        <select onclick="event.stopPropagation()" onchange="updateFormula('action')" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 6px;">
+          <option value="2">+2</option>
+          <option value="3">+3</option>
+        </select>
+      </div>
+    </div>
+    <button class="add-card-btn" onclick="addExperience('action')">＋ 新增經歷</button>
+  </div>
+
+  <div class="card">
+    <h2>公式預覽</h2>
+    <div class="formula-preview" id="action-formula">2d12 + 屬性值</div>
+  </div>
+
+  <button class="roll-btn" onclick="rollAction()">🎲 擲骰！</button>
+
+  <div class="result-area" id="action-result">
+    <div class="dh-result-row">
+      <div class="dh-result-box hope-box">
+        <div class="box-label">☀ 希望骰</div>
+        <div class="box-val" id="action-hope">—</div>
+      </div>
+      <div class="dh-result-box fear-box">
+        <div class="box-label">🌑 恐懼骰</div>
+        <div class="box-val" id="action-fear">—</div>
+      </div>
+    </div>
+    <div class="dh-verdict" id="action-verdict"></div>
+    <div class="result-breakdown" id="action-breakdown"></div>
+    <div class="result-total" id="action-total"></div>
+    <div class="result-label">總計</div>
+  </div>
+</div>
+
+<!-- ===== 反應檢定 ===== -->
+<div class="tab-panel" id="tab-reaction">
+
+  <div class="card">
+    <h2>使用屬性（點選）</h2>
+    <div class="attr-grid" id="reaction-attrs">
+      <div class="attr-item" onclick="selectAttr('reaction',this,1)" data-val="1">
+        <div class="attr-name">敏捷</div>
+        <div class="attr-val">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('reaction',this,1)" data-val="1">
+        <div class="attr-name">力量</div>
+        <div class="attr-val">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('reaction',this,1)" data-val="1">
+        <div class="attr-name">技巧</div>
+        <div class="attr-val">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('reaction',this,1)" data-val="1">
+        <div class="attr-name">直覺</div>
+        <div class="attr-val">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('reaction',this,1)" data-val="1">
+        <div class="attr-name">風采</div>
+        <div class="attr-val">1</div>
+      </div>
+      <div class="attr-item" onclick="selectAttr('reaction',this,1)" data-val="1">
+        <div class="attr-name">知識</div>
+        <div class="attr-val">1</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>加值選項</h2>
+    <div class="toggle-row" id="reaction-adv-row" onclick="toggleRow(this,'reaction-formula')">
+      <div>
+        <div class="toggle-label">優勢（Advantage）</div>
+        <div class="toggle-note">額外擲 +1d6</div>
+      </div>
+      <span class="toggle-badge">+1d6</span>
+      <input type="checkbox" id="reaction-adv">
+    </div>
+    <div id="reaction-experiences">
+      <div class="exp-row" onclick="toggleExpRow(this,'reaction-formula')">
+        <input type="checkbox">
+        <span class="exp-name"><input type="text" value="戰場反應" placeholder="經歷名稱" style="background:transparent;border:none;color:#e0e0e0;width:120px;" onclick="event.stopPropagation()"></span>
+        <select onclick="event.stopPropagation()" onchange="updateFormula('reaction')" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 6px;">
+          <option value="2">+2</option>
+          <option value="3">+3</option>
+        </select>
+      </div>
+    </div>
+    <button class="add-card-btn" onclick="addExperience('reaction')">＋ 新增經歷</button>
+  </div>
+
+  <div class="card">
+    <h2>公式預覽</h2>
+    <div class="formula-preview" id="reaction-formula">2d12 + 屬性值</div>
+  </div>
+
+  <button class="roll-btn" onclick="rollReaction()">🎲 擲骰！</button>
+
+  <div class="result-area" id="reaction-result">
+    <div class="dh-result-row">
+      <div class="dh-result-box hope-box">
+        <div class="box-label">☀ 希望骰</div>
+        <div class="box-val" id="reaction-hope">—</div>
+      </div>
+      <div class="dh-result-box fear-box">
+        <div class="box-label">🌑 恐懼骰</div>
+        <div class="box-val" id="reaction-fear">—</div>
+      </div>
+    </div>
+    <div class="dh-verdict" id="reaction-verdict"></div>
+    <div class="result-breakdown" id="reaction-breakdown"></div>
+    <div class="result-total" id="reaction-total"></div>
+    <div class="result-label">總計</div>
+  </div>
+</div>
+
+<!-- ===== 傷害計算 ===== -->
+<div class="tab-panel" id="tab-damage">
+
+  <div class="card">
+    <h2>角色 & 武器</h2>
+    <div class="row">
+      <div class="field">
+        <label>熟練值</label>
+        <input type="number" id="dmg-prof" value="3" min="1" max="6" class="w50" oninput="updateDamageFormula()">
+      </div>
+      <div class="field">
+        <label>武器骰型</label>
+        <select id="dmg-weapon-die" onchange="updateDamageFormula()" class="w70">
+          <option value="4">d4</option>
+          <option value="6">d6</option>
+          <option value="8" selected>d8</option>
+          <option value="10">d10</option>
+          <option value="12">d12</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>武器加值</label>
+        <input type="number" id="dmg-weapon-bonus" value="4" min="0" max="20" class="w50" oninput="updateDamageFormula()">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>種族 / 職業特性</h2>
+    <div id="dmg-traits">
+      <div class="toggle-row" onclick="toggleRow(this,'damage-formula')">
+        <div>
+          <div class="toggle-label"><input type="text" value="種族特性" placeholder="特性名稱" style="background:transparent;border:none;color:#e0e0e0;width:100px;" onclick="event.stopPropagation()"></div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select onclick="event.stopPropagation()" onchange="updateDamageFormula()" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 4px;">
+            <option value="flat">固定加值</option>
+            <option value="dice">骰子</option>
+          </select>
+          <input type="number" value="2" min="1" max="20" onclick="event.stopPropagation()" oninput="updateDamageFormula()" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;width:40px;text-align:center;padding:3px;">
+          <select onclick="event.stopPropagation()" onchange="updateDamageFormula()" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 4px;">
+            <option value="0">—</option>
+            <option value="4">d4</option>
+            <option value="6">d6</option>
+            <option value="8">d8</option>
+            <option value="10">d10</option>
+            <option value="12">d12</option>
+          </select>
+        </div>
+        <input type="checkbox">
+      </div>
+    </div>
+    <button class="add-card-btn" onclick="addTrait()">＋ 新增特性</button>
+  </div>
+
+  <div class="card">
+    <h2>領域卡（已準備）</h2>
+    <div id="dmg-domain-cards">
+      <div class="domain-card-row" onclick="toggleDomainCard(this,'damage-formula')">
+        <input type="checkbox">
+        <div class="domain-card-info">
+          <div class="domain-card-name">潛行強化</div>
+          <div class="domain-card-type">傷害</div>
+        </div>
+        <span class="domain-card-dice">+2d12</span>
+      </div>
+      <div class="domain-card-row" onclick="toggleDomainCard(this,'damage-formula')">
+        <input type="checkbox">
+        <div class="domain-card-info">
+          <div class="domain-card-name">盜賊之眼</div>
+          <div class="domain-card-type">傷害（條件觸發）</div>
+        </div>
+        <span class="domain-card-complex">⚠ 複雜效果</span>
+      </div>
+    </div>
+    <button class="add-card-btn" onclick="addDomainCard()">＋ 新增領域卡</button>
+    <div class="complex-warning" id="complex-warning">
+      ⚠ 你勾選了含有複雜效果的領域卡，請依照卡片說明自行判斷是否觸發，並手動加入效果。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>公式預覽</h2>
+    <div class="formula-preview" id="damage-formula">—</div>
+  </div>
+
+  <button class="roll-btn" onclick="rollDamage()">🎲 擲骰！</button>
+
+  <div class="result-area" id="damage-result">
+    <div class="result-formula" id="damage-result-formula"></div>
+    <div class="result-breakdown" id="damage-breakdown"></div>
+    <div class="result-total" id="damage-total"></div>
+    <div class="result-label">總傷害</div>
+  </div>
+</div>
+
+<script>
+// ========= 工具函式 =========
+function rollN(sides) {
+  return Math.floor(Math.random() * sides) + 1;
+}
+
+// 解析骰子公式字串 e.g. "2d8+4" -> [{dice:2,sides:8}, {flat:4}]
+function parseFormula(str) {
+  const parts = [];
+  str = str.replace(/\s/g, '');
+  const tokens = str.split(/(?=[+\-])/).filter(t => t !== '');
+  tokens.forEach(token => {
+    const diceMatch = token.match(/^([+\-]?)(\d*)d(\d+)$/i);
+    const flatMatch = token.match(/^([+\-]?\d+)$/);
+    if (diceMatch) {
+      const sign = diceMatch[1] === '-' ? -1 : 1;
+      const count = parseInt(diceMatch[2] || '1');
+      const sides = parseInt(diceMatch[3]);
+      parts.push({ dice: count * sign, sides });
+    } else if (flatMatch) {
+      parts.push({ flat: parseInt(flatMatch[1]) });
+    }
+  });
+  return parts;
+}
+
+// ========= 分頁切換 =========
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['action','reaction','damage'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ========= 屬性選擇 =========
+let selectedAttr = { action: null, reaction: null };
+
+function selectAttr(mode, el, val) {
+  const grid = document.getElementById(mode + '-attrs');
+  grid.querySelectorAll('.attr-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedAttr[mode] = parseInt(el.dataset.val);
+  if (mode === 'action') updateActionFormula();
+  else updateReactionFormula();
+}
+
+// ========= 切換 toggle =========
+function toggleRow(el, formulaId) {
+  el.classList.toggle('checked');
+  const cb = el.querySelector('input[type="checkbox"]');
+  if (cb) cb.checked = el.classList.contains('checked');
+  if (formulaId === 'action-formula') updateActionFormula();
+  else if (formulaId === 'reaction-formula') updateReactionFormula();
+  else if (formulaId === 'damage-formula') updateDamageFormula();
+}
+
+function toggleExpRow(el, formulaId) {
+  el.classList.toggle('checked');
+  const cb = el.querySelector('input[type="checkbox"]');
+  if (cb) cb.checked = el.classList.contains('checked');
+  if (formulaId === 'action-formula') updateActionFormula();
+  else updateReactionFormula();
+}
+
+function toggleDomainCard(el, formulaId) {
+  el.classList.toggle('checked');
+  const cb = el.querySelector('input[type="checkbox"]');
+  if (cb) cb.checked = el.classList.contains('checked');
+  updateDamageFormula();
+  // 複雜效果警告
+  const anyComplex = [...document.querySelectorAll('#dmg-domain-cards .domain-card-row.checked')]
+    .some(r => r.querySelector('.domain-card-complex'));
+  document.getElementById('complex-warning').classList.toggle('show', anyComplex);
+}
+
+// ========= 動作檢定公式 =========
+function updateActionFormula() {
+  const parts = buildCheckParts('action');
+  document.getElementById('action-formula').textContent = parts.label || '2d12';
+}
+
+function buildCheckParts(mode) {
+  const attrVal = selectedAttr[mode] || 0;
+  let label = '2d12';
+  const bonuses = [];
+  if (attrVal > 0) bonuses.push(`+${attrVal}`);
+
+  const advCb = document.getElementById(mode + '-adv');
+  if (advCb && advCb.checked) bonuses.push('+1d6');
+
+  const expRows = document.querySelectorAll(`#${mode}-experiences .exp-row`);
+  expRows.forEach(row => {
+    const cb = row.querySelector('input[type="checkbox"]');
+    if (cb && cb.checked) {
+      const sel = row.querySelector('select');
+      bonuses.push(`+${sel.value}`);
+    }
+  });
+
+  if (bonuses.length > 0) label += ' ' + bonuses.join(' ');
+  return { label, attrVal, advChecked: advCb ? advCb.checked : false, expRows };
+}
+
+function updateReactionFormula() {
+  const parts = buildCheckParts('reaction');
+  document.getElementById('reaction-formula').textContent = parts.label || '2d12';
+}
+
+// ========= 傷害公式 =========
+function updateDamageFormula() {
+  const parts = buildDamageParts();
+  document.getElementById('damage-formula').textContent = parts.label || '—';
+}
+
+function buildDamageParts() {
+  const prof = parseInt(document.getElementById('dmg-prof').value) || 1;
+  const wDie = parseInt(document.getElementById('dmg-weapon-die').value);
+  const wBonus = parseInt(document.getElementById('dmg-weapon-bonus').value) || 0;
+
+  let label = `${prof}d${wDie}`;
+  if (wBonus > 0) label += ` +${wBonus}`;
+
+  // 特性
+  const traitRows = document.querySelectorAll('#dmg-traits .toggle-row');
+  traitRows.forEach(row => {
+    if (!row.classList.contains('checked')) return;
+    const selects = row.querySelectorAll('select');
+    const nums = row.querySelectorAll('input[type="number"]');
+    if (!selects[0] || !nums[0]) return;
+    const type = selects[0].value;
+    const num = parseInt(nums[0].value) || 0;
+    const dieSel = selects[1] ? parseInt(selects[1].value) : 0;
+    if (type === 'flat' && num > 0) label += ` +${num}`;
+    else if (type === 'dice' && num > 0 && dieSel > 0) label += ` +${num}d${dieSel}`;
+  });
+
+  // 領域卡
+  const cardRows = document.querySelectorAll('#dmg-domain-cards .domain-card-row.checked');
+  cardRows.forEach(row => {
+    const diceEl = row.querySelector('.domain-card-dice');
+    if (diceEl) label += ` ${diceEl.textContent}`;
+  });
+
+  return { label, prof, wDie, wBonus };
+}
+
+// ========= 擲骰：動作/反應 =========
+function rollCheck(mode) {
+  const attrVal = selectedAttr[mode] || 0;
+  const advCb = document.getElementById(mode + '-adv');
+  const hasAdv = advCb && advCb.checked;
+
+  const hope = rollN(12);
+  const fear = rollN(12);
+  let total = hope + fear + attrVal;
+  const lines = [];
+
+  lines.push(`希望骰：${hope}`);
+  lines.push(`恐懼骰：${fear}`);
+  if (attrVal) lines.push(`屬性值：+${attrVal}`);
+  if (hasAdv) {
+    const adv = rollN(6);
+    total += adv;
+    lines.push(`優勢骰：+${adv}`);
+  }
+
+  // 經歷
+  const expRows = document.querySelectorAll(`#${mode}-experiences .exp-row`);
+  expRows.forEach(row => {
+    const cb = row.querySelector('input[type="checkbox"]');
+    if (cb && cb.checked) {
+      const sel = row.querySelector('select');
+      const val = parseInt(sel.value);
+      const name = row.querySelector('input[type="text"]').value || '經歷';
+      total += val;
+      lines.push(`${name}：+${val}`);
+    }
+  });
+
+  document.getElementById(mode + '-hope').textContent = hope;
+  document.getElementById(mode + '-fear').textContent = fear;
+
+  const verdict = document.getElementById(mode + '-verdict');
+  if (hope === fear) {
+    verdict.textContent = '✨ 關鍵成功！（Critical）';
+    verdict.className = 'dh-verdict verdict-crit';
+  } else if (hope > fear) {
+    verdict.textContent = '☀ 帶著希望成功！';
+    verdict.className = 'dh-verdict verdict-hope';
+  } else {
+    verdict.textContent = '🌑 帶著恐懼成功！';
+    verdict.className = 'dh-verdict verdict-fear';
+  }
+
+  document.getElementById(mode + '-breakdown').innerHTML = lines.join('<br>');
+  document.getElementById(mode + '-total').textContent = total;
+  document.getElementById(mode + '-result').classList.add('show');
+}
+
+function rollAction() { rollCheck('action'); }
+function rollReaction() { rollCheck('reaction'); }
+
+// ========= 擲骰：傷害 =========
+function rollDamage() {
+  const prof = parseInt(document.getElementById('dmg-prof').value) || 1;
+  const wDie = parseInt(document.getElementById('dmg-weapon-die').value);
+  const wBonus = parseInt(document.getElementById('dmg-weapon-bonus').value) || 0;
+
+  let total = 0;
+  const lines = [];
+
+  // 武器骰
+  const weaponRolls = [];
+  for (let i = 0; i < prof; i++) weaponRolls.push(rollN(wDie));
+  const weaponSum = weaponRolls.reduce((a,b)=>a+b,0);
+  total += weaponSum;
+  lines.push(`${prof}d${wDie}：[${weaponRolls.join(', ')}] = ${weaponSum}`);
+
+  if (wBonus > 0) {
+    total += wBonus;
+    lines.push(`武器加值：+${wBonus}`);
+  }
+
+  // 特性
+  const traitRows = document.querySelectorAll('#dmg-traits .toggle-row');
+  traitRows.forEach(row => {
+    if (!row.classList.contains('checked')) return;
+    const selects = row.querySelectorAll('select');
+    const nums = row.querySelectorAll('input[type="number"]');
+    const nameEl = row.querySelector('input[type="text"]');
+    const name = nameEl ? nameEl.value || '特性' : '特性';
+    if (!selects[0] || !nums[0]) return;
+    const type = selects[0].value;
+    const num = parseInt(nums[0].value) || 0;
+    const dieSel = selects[1] ? parseInt(selects[1].value) : 0;
+    if (type === 'flat' && num > 0) {
+      total += num;
+      lines.push(`${name}：+${num}`);
+    } else if (type === 'dice' && num > 0 && dieSel > 0) {
+      const rolls = [];
+      for (let i = 0; i < num; i++) rolls.push(rollN(dieSel));
+      const sum = rolls.reduce((a,b)=>a+b,0);
+      total += sum;
+      lines.push(`${name} ${num}d${dieSel}：[${rolls.join(', ')}] = ${sum}`);
+    }
+  });
+
+  // 領域卡
+  const cardRows = document.querySelectorAll('#dmg-domain-cards .domain-card-row.checked');
+  cardRows.forEach(row => {
+    const diceEl = row.querySelector('.domain-card-dice');
+    const nameEl = row.querySelector('.domain-card-name');
+    const name = nameEl ? nameEl.textContent : '領域卡';
+    if (!diceEl) return; // 複雜效果卡跳過自動計算
+    const formula = diceEl.textContent.replace('+','').trim();
+    const parsed = parseFormula(formula);
+    parsed.forEach(p => {
+      if (p.flat !== undefined) {
+        total += p.flat;
+        lines.push(`${name}：+${p.flat}`);
+      } else if (p.dice > 0) {
+        const rolls = [];
+        for (let i = 0; i < p.dice; i++) rolls.push(rollN(p.sides));
+        const sum = rolls.reduce((a,b)=>a+b,0);
+        total += sum;
+        lines.push(`${name} ${p.dice}d${p.sides}：[${rolls.join(', ')}] = ${sum}`);
+      }
+    });
+  });
+
+  const formula = buildDamageParts().label;
+  document.getElementById('damage-result-formula').textContent = formula;
+  document.getElementById('damage-breakdown').innerHTML = lines.join('<br>');
+  document.getElementById('damage-total').textContent = total;
+  document.getElementById('damage-result').classList.add('show');
+}
+
+// ========= 新增元素 =========
+function addExperience(mode) {
+  const container = document.getElementById(mode + '-experiences');
+  const row = document.createElement('div');
+  row.className = 'exp-row';
+  row.innerHTML = `
+    <input type="checkbox">
+    <span class="exp-name"><input type="text" placeholder="經歷名稱" style="background:transparent;border:none;color:#e0e0e0;width:120px;" onclick="event.stopPropagation()"></span>
+    <select onclick="event.stopPropagation()" onchange="updateFormula('${mode}')" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 6px;">
+      <option value="2">+2</option>
+      <option value="3">+3</option>
+    </select>
+    <button onclick="event.stopPropagation();this.parentElement.remove()" style="background:none;border:none;color:#f44336;cursor:pointer;">✕</button>
+  `;
+  row.onclick = function() { toggleExpRow(this, mode + '-formula'); };
+  container.appendChild(row);
+}
+
+function addTrait() {
+  const container = document.getElementById('dmg-traits');
+  const row = document.createElement('div');
+  row.className = 'toggle-row';
+  row.innerHTML = `
+    <div><div class="toggle-label"><input type="text" placeholder="特性名稱" style="background:transparent;border:none;color:#e0e0e0;width:100px;" onclick="event.stopPropagation()"></div></div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <select onclick="event.stopPropagation()" onchange="updateDamageFormula()" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 4px;">
+        <option value="flat">固定加值</option>
+        <option value="dice">骰子</option>
+      </select>
+      <input type="number" value="1" min="1" max="20" onclick="event.stopPropagation()" oninput="updateDamageFormula()" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;width:40px;text-align:center;padding:3px;">
+      <select onclick="event.stopPropagation()" onchange="updateDamageFormula()" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 4px;">
+        <option value="0">—</option>
+        <option value="4">d4</option>
+        <option value="6">d6</option>
+        <option value="8">d8</option>
+        <option value="10">d10</option>
+        <option value="12">d12</option>
+      </select>
+      <button onclick="event.stopPropagation();this.closest('.toggle-row').remove();updateDamageFormula()" style="background:none;border:none;color:#f44336;cursor:pointer;">✕</button>
+    </div>
+    <input type="checkbox">
+  `;
+  row.onclick = function() { toggleRow(this, 'damage-formula'); };
+  container.appendChild(row);
+}
+
+function addDomainCard() {
+  const container = document.getElementById('dmg-domain-cards');
+  const row = document.createElement('div');
+  row.className = 'domain-card-row';
+  row.innerHTML = `
+    <input type="checkbox">
+    <div class="domain-card-info">
+      <div class="domain-card-name"><input type="text" placeholder="卡牌名稱" style="background:transparent;border:none;color:#e0e0e0;width:110px;" onclick="event.stopPropagation()"></div>
+      <div class="domain-card-type" style="font-size:0.7rem;color:#666;">傷害</div>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center;">
+      <span style="color:#c9a84c;">+</span>
+      <input type="number" value="1" min="1" max="6" onclick="event.stopPropagation()" oninput="updateDomainCardBadge(this)" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;width:36px;text-align:center;padding:3px;">
+      <select onclick="event.stopPropagation()" onchange="updateDomainCardBadge(this)" style="background:#0f0f23;border:1px solid #3a3a5a;border-radius:4px;color:#c9a84c;padding:2px 4px;">
+        <option value="4">d4</option>
+        <option value="6">d6</option>
+        <option value="8">d8</option>
+        <option value="10" selected>d10</option>
+        <option value="12">d12</option>
+      </select>
+      <button onclick="event.stopPropagation();this.closest('.domain-card-row').remove();updateDamageFormula()" style="background:none;border:none;color:#f44336;cursor:pointer;">✕</button>
+    </div>
+  `;
+  row.onclick = function() { toggleDomainCard(this, 'damage-formula'); };
+  container.appendChild(row);
+}
+
+function updateDomainCardBadge(el) {
+  updateDamageFormula();
+}
+
+// 初始化
+updateDamageFormula();
+</script>
+</body>
+</html>
