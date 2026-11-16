@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
   Store.load();
   document.getElementById('weaponList').innerHTML = WEAPONS.map((w) => `<option value="${esc(w.name)}"></option>`).join('');
 
+  const domainNames = [...new Set(DOMAIN_CARDS.map((c) => c.domain))];
+  document.getElementById('domainList').innerHTML = domainNames.map((d) => `<option value="${esc(d)}"></option>`).join('');
+
   Sheet.init();
   Roller.init();
   renderAll();

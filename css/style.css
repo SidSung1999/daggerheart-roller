@@ -154,6 +154,19 @@ main { padding: 16px; max-width: 1200px; margin: 0 auto; }
 .side input { margin-bottom: 6px; }
 
 /* ---------- 領域卡 ---------- */
+.library { border: 1px solid var(--line2); border-radius: 10px; padding: 10px; margin-bottom: 12px; background: var(--field); }
+.library > summary { cursor: pointer; color: var(--gold); font-weight: bold; }
+.lib-filters { display: grid; grid-template-columns: 1fr 120px 1.4fr; gap: 8px; margin: 10px 0; align-items: end; }
+.lib-filters label { display: flex; flex-direction: column; gap: 3px; font-size: 0.72rem; color: var(--muted); }
+#libResults { max-height: 420px; overflow-y: auto; }
+.lib-item { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; background: var(--panel); }
+.lib-item summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.lib-item summary::-webkit-details-marker { display: none; }
+.lib-name { font-weight: bold; }
+.lib-meta { flex: 1; color: var(--muted); font-size: 0.75rem; }
+.lib-item p { margin-top: 8px; font-size: 0.85rem; line-height: 1.6; color: #c0c0d0; }
+.lib-add { background: var(--gold); color: #1a1a2e; border: none; border-radius: 6px; padding: 3px 14px; font-weight: bold; }
+.lib-add:disabled { background: var(--line2); color: var(--muted); cursor: default; }
 .dcard { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; background: var(--field); }
 .dcard.prepared { border-color: var(--gold); background: var(--gold-bg); }
 .dcard-top { display: grid; grid-template-columns: 70px 1.4fr 1fr 0.8fr 88px 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
@@ -247,4 +260,6 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
   .wgrid.whead { display: none; }
   .dcard-top { grid-template-columns: 1fr 1fr; }
   .fx-grid { grid-template-columns: 1fr; }
+  .lib-filters { grid-template-columns: 1fr; }
+  .lib-item summary { flex-wrap: wrap; }
 }

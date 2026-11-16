@@ -18,8 +18,8 @@ const Sheet = (() => {
     const v = getPath(ch(), path);
     return v == null ? '' : v;
   };
-  const text = (path, ph = '') =>
-    `<input type="text" data-bind="${path}" value="${esc(val(path))}" placeholder="${esc(ph)}">`;
+  const text = (path, ph = '', extra = '') =>
+    `<input type="text" data-bind="${path}" value="${esc(val(path))}" placeholder="${esc(ph)}" ${extra}>`;
   const num = (path, extra = '') =>
     `<input type="number" data-bind="${path}" data-type="number" value="${esc(val(path))}" ${extra}>`;
   const area = (path, rows = 3, ph = '') =>
@@ -75,6 +75,84 @@ const Sheet = (() => {
     return ch().domainCards.filter((x) => x.prepared).length;
   }
 
+  /* ---------- 領域卡庫（從全部卡片中挑選加入） ---------- */
+  const LIB_LIMIT = 60;
+  const lib = { open: false, domain: 'mine', maxLevel: null, q: '' }; // maxLevel 為 null 時跟著角色等級
+
+  const domainKey = (d) => String(d).split(/\s+/)[0]; // 「午夜 Midnight」 -> 「午夜」
+
+  function libMatches() {
+    const c = ch();
+    const maxLv = lib.maxLevel == null ? Number(c.level) || 1 : lib.maxLevel;
+    const q = lib.q.trim().toLowerCase();
+    const mine = c.domains.filter((d) => d && d.trim());
+    return DOMAIN_CARDS.map((card, idx) => ({ card, idx })).filter(({ card }) => {
+      if (card.level > maxLv) return false;
+      if (lib.domain === 'mine') {
+        if (!mine.some((d) => d.includes(domainKey(card.domain)))) return false;
+      } else if (lib.domain !== 'all' && card.domain !== lib.domain) {
+        return false;
+      }
+      return !q || `${card.name} ${card.orig || ''} ${card.desc}`.toLowerCase().includes(q);
+    });
+  }
+
+  function libResultsHtml() {
+    const c = ch();
+    if (lib.domain === 'mine' && !c.domains.some((d) => d && d.trim())) {
+      return '<p class="muted">尚未填寫「領域」欄位。請先在右側填入領域，或把篩選改成「全部領域」。</p>';
+    }
+    const found = libMatches();
+    if (!found.length) return '<p class="muted">沒有符合條件的卡片</p>';
+    const rows = found.slice(0, LIB_LIMIT).map(({ card, idx }) => {
+      const has = c.domainCards.some((x) => x.name === card.name && x.domain === card.domain);
+      return `<details class="lib-item">
+        <summary>
+          <span class="lib-name">${esc(card.name)}</span>
+          <span class="lib-meta">${esc(card.domain)}・Lv${card.level}・${esc(card.type)}・喚回 ${card.recall}</span>
+          <button type="button" class="lib-add" data-libadd="${idx}" ${has ? 'disabled' : ''}>${has ? '已加入' : '加入'}</button>
+        </summary>
+        <p>${esc(card.desc)}</p>
+      </details>`;
+    });
+    const more = found.length > LIB_LIMIT ? `<p class="muted">共 ${found.length} 張，僅顯示前 ${LIB_LIMIT} 張，請縮小篩選條件</p>` : `<p class="muted">共 ${found.length} 張</p>`;
+    return rows.join('') + more;
+  }
+
+  function libHtml() {
+    const c = ch();
+    const domains = [...new Set(DOMAIN_CARDS.map((x) => x.domain))];
+    const opts = [
+      `<option value="mine" ${lib.domain === 'mine' ? 'selected' : ''}>我的領域</option>`,
+      `<option value="all" ${lib.domain === 'all' ? 'selected' : ''}>全部領域</option>`,
+      ...domains.map((d) => `<option value="${esc(d)}" ${lib.domain === d ? 'selected' : ''}>${esc(d)}</option>`),
+    ].join('');
+    const lv = lib.maxLevel == null ? Number(c.level) || 1 : lib.maxLevel;
+    return `<details class="library" ${lib.open ? 'open' : ''}>
+      <summary>📚 從卡片庫選擇（共 ${DOMAIN_CARDS.length} 張）</summary>
+      <div class="lib-filters">
+        <select data-lib="domain">${opts}</select>
+        <label>等級上限<input type="number" data-lib="level" min="1" max="10" value="${lv}"></label>
+        <input type="text" data-lib="q" value="${esc(lib.q)}" placeholder="搜尋名稱或描述">
+      </div>
+      <div id="libResults">${libResultsHtml()}</div>
+    </details>`;
+  }
+
+  function addFromLibrary(idx) {
+    const src = DOMAIN_CARDS[idx];
+    if (!src) return;
+    const c = ch();
+    if (c.domainCards.some((x) => x.name === src.name && x.domain === src.domain)) return;
+    const card = TEMPLATES.domainCards();
+    Object.assign(card, { domain: src.domain, type: src.type, recall: src.recall, name: src.name, desc: src.desc });
+    Object.assign(card.fx, DOMAIN_CARD_FX[`${src.domain}|${src.name}`] || {});
+    c.domainCards.push(card);
+    Store.save();
+    render();
+    toast(`已加入「${src.name}」`);
+  }
+
   function domainCardRow(card, i) {
     const p = `domainCards.${i}`;
     const target = EFFECT_TARGETS.find((t) => t.value === card.fx.target);
@@ -86,7 +164,7 @@ const Sheet = (() => {
       <div class="dcard-top">
         <label class="prep" title="準備（最多 ${MAX_PREPARED} 張）">${check(p + '.prepared', 'data-prep')}<span>準備</span></label>
         ${text(p + '.name', '卡片名稱')}
-        ${text(p + '.domain', '領域')}
+        ${text(p + '.domain', '領域', 'list="domainList"')}
         ${text(p + '.type', '類別')}
         <label class="recall">喚回 ${num(p + '.recall', 'min="0"')}</label>
         <button type="button" class="x" data-del="domainCards.${i}" aria-label="刪除領域卡">✕</button>
@@ -109,6 +187,13 @@ const Sheet = (() => {
   function render() {
     const c = ch();
     if (!c) return;
+
+    const prevLib = root().querySelector('.library'); // 重畫前記住卡片庫是否展開
+    if (prevLib) lib.open = prevLib.open;
+    if (lib.charId !== c.id) {
+      // 切換角色時，卡片庫的篩選條件回到預設
+      Object.assign(lib, { charId: c.id, domain: 'mine', maxLevel: null, q: '' });
+    }
 
     const attrBoxes = ATTRS.map(
       (a) => `<div class="stat-box attr">
@@ -238,15 +323,16 @@ const Sheet = (() => {
             `<div class="portrait">${c.portrait ? `<img src="${esc(c.portrait)}" alt="頭像">` : '<span>頭像</span>'}</div>
              ${text('portrait', '圖片網址')}`
           )}
-          ${section('領域', `${text('domains.0', '領域 1')}${text('domains.1', '領域 2')}`)}
+          ${section('領域', `${text('domains.0', '領域 1', 'list="domainList"')}${text('domains.1', '領域 2', 'list="domainList"')}`)}
           ${section('金幣', text('gold'))}
         </div>
       </div>
 
       ${section(
         `領域卡 <span class="prof">已準備 <b id="prepCount">${preparedCount()}</b>/${MAX_PREPARED}　持有 ${c.domainCards.length} 張（等級 ${c.level} 可持有 ${Number(c.level) + 1} 張）</span>`,
-        `${cards || '<p class="muted">尚未新增領域卡</p>'}
-         <button type="button" class="add" data-add="domainCards">＋ 新增領域卡</button>`
+        `${libHtml()}
+         ${cards || '<p class="muted">尚未新增領域卡</p>'}
+         <button type="button" class="add" data-add="domainCards">＋ 新增自訂領域卡</button>`
       )}
 
       <div class="cols two">
@@ -277,8 +363,23 @@ const Sheet = (() => {
     if (el) el.textContent = preparedCount();
   }
 
+  function refreshLibResults() {
+    const el = document.getElementById('libResults');
+    if (el) el.innerHTML = libResultsHtml();
+  }
+
   function onInput(e) {
     const el = e.target;
+
+    // 卡片庫的篩選條件
+    if (el.dataset && el.dataset.lib) {
+      if (el.dataset.lib === 'domain') lib.domain = el.value;
+      else if (el.dataset.lib === 'q') lib.q = el.value;
+      else if (el.dataset.lib === 'level') lib.maxLevel = el.value === '' ? null : Number(el.value);
+      refreshLibResults();
+      return;
+    }
+
     const path = el.dataset && el.dataset.bind;
     if (!path) return;
 
@@ -301,6 +402,7 @@ const Sheet = (() => {
     Store.save();
 
     if (path === 'name') refreshBar();
+    if (path.startsWith('domains.')) refreshLibResults();
     if (['hpMax', 'stressMax', 'armorSlots'].includes(path)) {
       Object.keys(TRACKS).forEach((n) => TRACKS[n].max === path && renderTrack(n));
     }
@@ -333,6 +435,12 @@ const Sheet = (() => {
   function onClick(e) {
     const btn = e.target.closest('button');
     if (!btn) return;
+
+    if (btn.dataset.libadd !== undefined) {
+      e.preventDefault(); // 按鈕在 <summary> 裡，避免同時展開/收合描述
+      addFromLibrary(Number(btn.dataset.libadd));
+      return;
+    }
 
     if (btn.dataset.track) {
       const t = TRACKS[btn.dataset.track];
