@@ -30,7 +30,17 @@ function downloadText(filename, text) {
 
 document.addEventListener('DOMContentLoaded', () => {
   Store.load();
-  document.getElementById('weaponList').innerHTML = WEAPONS.map((w) => `<option value="${esc(w.name)}"></option>`).join('');
+  const frameTag = (x) => (x.frame && x.frame !== '標準' ? `・${x.frame}` : '');
+  const weaponOptions = (list) =>
+    list
+      .map((w) => `<option value="${esc(w.name)}" label="${esc(`T${w.tier}・${w.hands}・${w.trait}・${w.range}・${w.damage}${frameTag(w)}`)}"></option>`)
+      .join('');
+  document.getElementById('weaponList').innerHTML = weaponOptions(WEAPONS);
+  document.getElementById('mainWeaponList').innerHTML = weaponOptions(WEAPONS.filter((w) => w.hands !== '副手'));
+  document.getElementById('offWeaponList').innerHTML = weaponOptions(WEAPONS.filter((w) => w.hands === '副手'));
+  document.getElementById('armorList').innerHTML = ARMORS.map(
+    (a) => `<option value="${esc(a.name)}" label="${esc(`T${a.tier}・閾值 ${a.major}/${a.severe}・護甲值 ${a.score}${frameTag(a)}`)}"></option>`
+  ).join('');
 
   const domainNames = [...new Set(DOMAIN_CARDS.map((c) => c.domain))];
   document.getElementById('domainList').innerHTML = domainNames.map((d) => `<option value="${esc(d)}"></option>`).join('');

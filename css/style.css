@@ -139,12 +139,15 @@ main { padding: 16px; max-width: 1200px; margin: 0 auto; }
 }
 .add:hover { border-color: var(--gold); color: var(--gold); }
 
-.wgrid { display: grid; grid-template-columns: 1.3fr 0.7fr 1.4fr 0.7fr 0.9fr 0.7fr; gap: 4px; margin-bottom: 6px; }
-.wgrid.whead { font-size: 0.7rem; color: var(--muted); margin-bottom: 2px; }
+.wcard { border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin-bottom: 8px; background: var(--field); }
+.wgrid { display: grid; grid-template-columns: 1.6fr 0.8fr 0.8fr 1.1fr 0.8fr; gap: 6px; align-items: center; margin-bottom: 6px; }
+.wgrid.has-del { grid-template-columns: 1.6fr 0.8fr 0.8fr 1.1fr 0.8fr 28px; }
 .wgrid input { padding: 5px 6px; font-size: 0.85rem; }
+.wcard textarea { font-size: 0.85rem; }
 .wlabel { font-size: 0.75rem; color: var(--gold); margin: 6px 0 2px; }
-.inv-row { display: grid; grid-template-columns: 1fr 28px; align-items: center; gap: 4px; }
-.armor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.armor-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; margin-top: 4px; }
+.armor-grid .wide { grid-column: 1 / -1; }
+.armor-grid textarea { field-sizing: content; line-height: 1.5; min-height: calc(2 * 1.5em + 14px); }
 
 .portrait {
   aspect-ratio: 1; background: var(--field); border: 1px dashed var(--line2); border-radius: 10px;
@@ -160,15 +163,28 @@ main { padding: 16px; max-width: 1200px; margin: 0 auto; }
 .lib-filters label { display: flex; flex-direction: column; gap: 3px; font-size: 0.72rem; color: var(--muted); }
 #libResults { max-height: 420px; overflow-y: auto; }
 .lib-item { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; background: var(--panel); }
-.lib-item summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.lib-item summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; cursor: pointer; list-style: none; }
 .lib-item summary::-webkit-details-marker { display: none; }
 .lib-name { font-weight: bold; }
 .lib-meta { flex: 1; color: var(--muted); font-size: 0.75rem; }
 .lib-item p { margin-top: 8px; font-size: 0.85rem; line-height: 1.6; color: #c0c0d0; }
 .lib-add { background: var(--gold); color: #1a1a2e; border: none; border-radius: 6px; padding: 3px 14px; font-weight: bold; }
 .lib-add:disabled { background: var(--line2); color: var(--muted); cursor: default; }
+.wlib-filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 6px; }
+.wlib-filters label { display: flex; flex-direction: column; gap: 3px; font-size: 0.72rem; color: var(--muted); }
+.wlib-q { margin-bottom: 8px; }
+.lib-results { max-height: 420px; overflow-y: auto; }
+.lib-item .lib-add { padding: 3px 10px; }
+.hands { margin-left: 10px; font-size: 0.72rem; color: var(--muted); font-weight: normal; }
+.hands select { width: auto; padding: 2px 6px; }
+.off-slot { border: 0; padding: 0; margin: 0; min-width: 0; }
+.off-slot[disabled] { opacity: 0.45; }
+.off-note { margin-left: 8px; color: #f0a030; font-size: 0.72rem; }
 .dcard { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; background: var(--field); }
 .dcard.prepared { border-color: var(--gold); background: var(--gold-bg); }
+/* 描述依內容自動調整高度（Chrome / Edge 123 以上；其他瀏覽器維持固定 3 行） */
+.dcard > textarea { field-sizing: content; line-height: 1.5; min-height: calc(3 * 1.5em + 14px); }
+.wcard > textarea { field-sizing: content; line-height: 1.5; min-height: calc(2 * 1.5em + 14px); }
 .dcard-top { display: grid; grid-template-columns: 70px 1.4fr 1fr 0.8fr 88px 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
 .prep { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; }
 .recall { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
@@ -256,10 +272,10 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
   .head-grid { grid-template-columns: 1fr 1fr; }
   .stats { grid-template-columns: repeat(4, 1fr); }
   .cols, .cols.two { grid-template-columns: 1fr; }
-  .wgrid { grid-template-columns: 1fr 1fr 1fr; }
-  .wgrid.whead { display: none; }
+  .wgrid, .wgrid.has-del { grid-template-columns: 1fr 1fr; }
   .dcard-top { grid-template-columns: 1fr 1fr; }
   .fx-grid { grid-template-columns: 1fr; }
+  .armor-grid { grid-template-columns: 1fr 1fr; }
   .lib-filters { grid-template-columns: 1fr; }
   .lib-item summary { flex-wrap: wrap; }
 }

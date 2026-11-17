@@ -11,7 +11,7 @@ const Sheet = (() => {
     armor: { marked: 'armorMarked', max: 'armorSlots', min: 0, cap: 12, label: '護甲' },
   };
 
-  const WEAPON_FIELDS = ['name', 'trait', 'features', 'range', 'damage', 'type'];
+  const WEAPON_FIELDS = ['name', 'trait', 'features', 'range', 'damage', 'type', 'hands'];
 
   /* ---------- 小元件 ---------- */
   const val = (path) => {
@@ -57,18 +57,25 @@ const Sheet = (() => {
   }
 
   /* ---------- 武器 ---------- */
-  function weaponRow(prefix) {
-    return `<div class="wgrid">
-      <input list="weaponList" data-bind="${prefix}.name" data-weapon="${prefix}" value="${esc(val(prefix + '.name'))}" placeholder="武器名稱">
-      ${text(prefix + '.trait', '屬性')}
-      ${text(prefix + '.features', '特徵')}
-      ${text(prefix + '.range', '射程')}
-      ${text(prefix + '.damage', '例：d8+4')}
-      ${text(prefix + '.type', '類型')}
+  // 主手只提示單手/雙手武器，副手只提示副手類武器，庫存提示全部
+  const WEAPON_LISTS = { 'weapons.main': 'mainWeaponList', 'weapons.off': 'offWeaponList' };
+
+  // 版面比照領域卡：上排是名稱、屬性、射程、傷害、類型，特徵（描述）放在下一排。
+  // delPath 有值時，右上角多一個刪除按鈕（庫存武器用）。
+  function weaponRow(prefix, delPath = '') {
+    const del = delPath ? `<button type="button" class="x" data-del="${delPath}" aria-label="刪除武器">✕</button>` : '';
+    return `<div class="wcard">
+      <div class="wgrid ${delPath ? 'has-del' : ''}">
+        <input list="${WEAPON_LISTS[prefix] || 'weaponList'}" data-bind="${prefix}.name" data-weapon="${prefix}" value="${esc(val(prefix + '.name'))}" placeholder="武器名稱" title="武器名稱">
+        ${text(prefix + '.trait', '屬性', 'title="屬性"')}
+        ${text(prefix + '.range', '射程', 'title="射程"')}
+        ${text(prefix + '.damage', '傷害 例：d8+4', 'title="傷害數值（骰數會乘以熟練值）"')}
+        ${text(prefix + '.type', '類型', 'title="傷害類型"')}
+        ${del}
+      </div>
+      ${area(prefix + '.features', 2, '特徵')}
     </div>`;
   }
-
-  const weaponHead = `<div class="wgrid whead"><span>名稱</span><span>屬性</span><span>特徵</span><span>射程</span><span>傷害數值</span><span>傷害類型</span></div>`;
 
   /* ---------- 領域卡 ---------- */
   function preparedCount() {
@@ -128,7 +135,7 @@ const Sheet = (() => {
       ...domains.map((d) => `<option value="${esc(d)}" ${lib.domain === d ? 'selected' : ''}>${esc(d)}</option>`),
     ].join('');
     const lv = lib.maxLevel == null ? Number(c.level) || 1 : lib.maxLevel;
-    return `<details class="library" ${lib.open ? 'open' : ''}>
+    return `<details class="library" id="domainLib" ${lib.open ? 'open' : ''}>
       <summary>📚 從卡片庫選擇（共 ${DOMAIN_CARDS.length} 張）</summary>
       <div class="lib-filters">
         <select data-lib="domain">${opts}</select>
@@ -188,8 +195,10 @@ const Sheet = (() => {
     const c = ch();
     if (!c) return;
 
-    const prevLib = root().querySelector('.library'); // 重畫前記住卡片庫是否展開
+    const prevLib = root().querySelector('#domainLib'); // 重畫前記住各個資料庫面板是否展開
     if (prevLib) lib.open = prevLib.open;
+    WeaponLib.captureOpen(root());
+    ArmorLib.captureOpen(root());
     if (lib.charId !== c.id) {
       // 切換角色時，卡片庫的篩選條件回到預設
       Object.assign(lib, { charId: c.id, domain: 'mine', maxLevel: null, q: '' });
@@ -215,7 +224,7 @@ const Sheet = (() => {
 
     const inventoryWeapons = c.inventoryWeapons
       .map(
-        (_, i) => `<div class="inv-row">${weaponRow(`inventoryWeapons.${i}`)}<button type="button" class="x" data-del="inventoryWeapons.${i}" aria-label="刪除">✕</button></div>`
+        (_, i) => weaponRow(`inventoryWeapons.${i}`, `inventoryWeapons.${i}`)
       )
       .join('');
 
@@ -297,22 +306,33 @@ const Sheet = (() => {
         <div class="col">
           ${section(
             `武器 <span class="prof">熟練值：${num('proficiency', 'class="narrow" min="1" max="6"')}</span>`,
-            `${weaponHead}
-             <div class="wlabel">主手武器</div>${weaponRow('weapons.main')}
-             <div class="wlabel">副手武器</div>${weaponRow('weapons.off')}`
+            `${WeaponLib.html()}
+             <div class="wlabel">主手武器
+               <label class="hands">負荷
+                 <select data-bind="weapons.main.hands">
+                   ${['', '單手', '雙手'].map((v) => `<option value="${v}" ${val('weapons.main.hands') === v ? 'selected' : ''}>${v || '—'}</option>`).join('')}
+                 </select>
+               </label>
+             </div>${weaponRow('weapons.main')}
+             <fieldset class="off-slot" ${WeaponLib.isTwoHanded() ? 'disabled' : ''}>
+               <div class="wlabel">副手武器
+                 <span class="off-note" ${WeaponLib.isTwoHanded() ? '' : 'hidden'}>主手是雙手武器，無法配副手</span>
+               </div>${weaponRow('weapons.off')}
+             </fieldset>`
           )}
           ${section(
             '護甲',
-            `<div class="armor-grid">
-              ${field('名稱', text('armor.name'))}
+            `${ArmorLib.html()}
+             <div class="armor-grid">
+              ${field('名稱', text('armor.name', '輸入或選擇護甲', 'list="armorList" data-armor="1"'))}
               ${field('基礎傷害閾值', text('armor.baseThreshold'))}
-              ${field('特徵', text('armor.features'))}
               ${field('基礎護甲值', text('armor.baseScore'))}
+              ${field('特徵', area('armor.features', 2, '特徵'), 'wide')}
             </div>`
           )}
           ${section(
             '庫存武器',
-            `${weaponHead}${inventoryWeapons}
+            `${inventoryWeapons}
              <button type="button" class="add" data-add="inventoryWeapons">＋ 新增庫存武器</button>`
           )}
         </div>
@@ -329,7 +349,7 @@ const Sheet = (() => {
       </div>
 
       ${section(
-        `領域卡 <span class="prof">已準備 <b id="prepCount">${preparedCount()}</b>/${MAX_PREPARED}　持有 ${c.domainCards.length} 張（等級 ${c.level} 可持有 ${Number(c.level) + 1} 張）</span>`,
+        `領域卡 <span class="prof">已準備 <b id="prepCount">${preparedCount()}</b>/${MAX_PREPARED}　持有 ${c.domainCards.length} 張</span>`,
         `${libHtml()}
          ${cards || '<p class="muted">尚未新增領域卡</p>'}
          <button type="button" class="add" data-add="domainCards">＋ 新增自訂領域卡</button>`
@@ -363,6 +383,30 @@ const Sheet = (() => {
     if (el) el.textContent = preparedCount();
   }
 
+  // 主手負荷改變時，更新副手欄的停用狀態與武器庫按鈕（不重畫整頁，避免失去輸入焦點）
+  function refreshOffLock() {
+    const locked = WeaponLib.isTwoHanded();
+    const fs = root().querySelector('.off-slot');
+    if (fs) {
+      fs.disabled = locked;
+      const note = fs.querySelector('.off-note');
+      if (note) note.hidden = !locked;
+    }
+    WeaponLib.refresh();
+  }
+
+  // 主手改成雙手武器時，副手武器不能同時裝備：移到庫存並重畫
+  function applyHandsRule() {
+    const moved = enforceTwoHanded(ch());
+    if (moved) {
+      Store.save();
+      render();
+      toast(`主手是雙手武器，副手「${moved}」已移到庫存`);
+    } else {
+      refreshOffLock();
+    }
+  }
+
   function refreshLibResults() {
     const el = document.getElementById('libResults');
     if (el) el.innerHTML = libResultsHtml();
@@ -370,6 +414,16 @@ const Sheet = (() => {
 
   function onInput(e) {
     const el = e.target;
+
+    // 武器庫、護甲庫的篩選條件
+    if (el.dataset && el.dataset.wlib) {
+      WeaponLib.onFilter(el);
+      return;
+    }
+    if (el.dataset && el.dataset.alib) {
+      ArmorLib.onFilter(el);
+      return;
+    }
 
     // 卡片庫的篩選條件
     if (el.dataset && el.dataset.lib) {
@@ -403,6 +457,7 @@ const Sheet = (() => {
 
     if (path === 'name') refreshBar();
     if (path.startsWith('domains.')) refreshLibResults();
+    if (path === 'weapons.main.hands') applyHandsRule();
     if (['hpMax', 'stressMax', 'armorSlots'].includes(path)) {
       Object.keys(TRACKS).forEach((n) => TRACKS[n].max === path && renderTrack(n));
     }
@@ -426,6 +481,20 @@ const Sheet = (() => {
           if (inp) inp.value = w[f] || '';
         });
         Store.save();
+        if (prefix === 'weapons.main') applyHandsRule();
+      }
+    }
+    // 護甲名稱符合護甲清單時，自動帶入傷害閾值、特徵、護甲值
+    if (el.dataset && el.dataset.armor) {
+      const a = ARMORS.find((x) => x.name === el.value);
+      if (a) {
+        const fill = { 'armor.baseThreshold': `${a.major} / ${a.severe}`, 'armor.features': a.features, 'armor.baseScore': a.score };
+        Object.keys(fill).forEach((path) => {
+          setPath(ch(), path, fill[path]);
+          const inp = root().querySelector(`[data-bind="${path}"]`);
+          if (inp) inp.value = fill[path];
+        });
+        Store.save();
       }
     }
     if (el.dataset && el.dataset.bind === 'portrait') render();
@@ -435,6 +504,18 @@ const Sheet = (() => {
   function onClick(e) {
     const btn = e.target.closest('button');
     if (!btn) return;
+
+    if (btn.dataset.aadd !== undefined) {
+      e.preventDefault();
+      ArmorLib.add(Number(btn.dataset.aadd));
+      return;
+    }
+
+    if (btn.dataset.wadd !== undefined) {
+      e.preventDefault();
+      WeaponLib.add(btn.dataset.slot, Number(btn.dataset.wadd));
+      return;
+    }
 
     if (btn.dataset.libadd !== undefined) {
       e.preventDefault(); // 按鈕在 <summary> 裡，避免同時展開/收合描述

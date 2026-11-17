@@ -92,10 +92,8 @@ const Roller = (() => {
 
   function damageSources() {
     const c = ch();
-    const list = [
-      { path: 'weapons.main', slot: '主手' },
-      { path: 'weapons.off', slot: '副手' },
-    ];
+    const list = [{ path: 'weapons.main', slot: '主手' }];
+    if (c.weapons.main.hands !== '雙手') list.push({ path: 'weapons.off', slot: '副手' }); // 雙手武器不能配副手
     c.inventoryWeapons.forEach((_, i) => list.push({ path: `inventoryWeapons.${i}`, slot: `庫存 ${i + 1}` }));
     return list.map((s) => ({ ...s, weapon: getPath(c, s.path) }));
   }

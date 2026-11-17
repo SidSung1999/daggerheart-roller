@@ -11,13 +11,8 @@ const ATTRS = [
 
 const MAX_PREPARED = 5;
 
-// 範例武器。之後換成 Excel 武器分頁的完整資料即可。
-// damage 的骰數代表「乘以熟練值」，例如 d8+4 在熟練值 3 時為 3d8+4。
-const WEAPONS = [
-  { name: '(範例) 武器 A', trait: '敏捷', range: '近戰', damage: 'd8+4', type: '物理', features: '' },
-  { name: '(範例) 武器 B', trait: '力量', range: '近戰', damage: 'd12', type: '物理', features: '' },
-  { name: '(範例) 武器 C', trait: '技巧', range: '遠距離', damage: 'd4+6', type: '物理', features: '' },
-];
+// 武器清單 WEAPONS 在 js/weapons.js、護甲清單 ARMORS 在 js/armors.js（由 CSV 自動產生）。
+// 武器 damage 的骰數代表「乘以熟練值」，例如 d8+4 在熟練值 3 時為 3d8+4。
 
 const EFFECT_TARGETS = [
   { value: 'none', label: '無（僅記錄）' },
@@ -27,7 +22,8 @@ const EFFECT_TARGETS = [
 ];
 
 function emptyWeapon() {
-  return { name: '', trait: '', features: '', range: '', damage: '', type: '' };
+  // hands：負荷（單手 / 雙手 / 副手），用來判斷主手是否能再配副手
+  return { name: '', trait: '', features: '', range: '', damage: '', type: '', hands: '' };
 }
 
 const TEMPLATES = {
@@ -121,6 +117,9 @@ function sampleCharacter() {
 
 /* ---------- 共用小工具 ---------- */
 
+// 角色等級對應的階級：等級 1 / 2-4 / 5-7 / 8-10 → 階級 1 / 2 / 3 / 4
+const tierOfLevel = (lv) => (lv <= 1 ? 1 : lv <= 4 ? 2 : lv <= 7 ? 3 : 4);
+
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
@@ -175,5 +174,18 @@ function normalizeCharacter(c) {
   });
   if (!Array.isArray(c.domains)) c.domains = ['', ''];
   if (!c.id) c.id = uid();
+  enforceTwoHanded(c); // 舊資料或匯入資料也套用「雙手武器不能配副手」
   return c;
+}
+
+// 主手是雙手武器時，副手不能同時裝備：把副手武器移到庫存並清空副手欄。
+// 回傳被移走的武器名稱，沒有移動則回傳空字串。
+function enforceTwoHanded(c) {
+  if (c.weapons.main.hands !== '雙手' || !c.weapons.off.name.trim()) return '';
+  const moved = { ...c.weapons.off };
+  const slot = c.inventoryWeapons.find((x) => !x.name.trim());
+  if (slot) Object.assign(slot, moved);
+  else c.inventoryWeapons.push(moved);
+  c.weapons.off = emptyWeapon();
+  return moved.name;
 }
