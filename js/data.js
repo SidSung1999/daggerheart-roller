@@ -39,7 +39,8 @@ const TEMPLATES = {
     fx: { target: 'none', formula: '', scaleProf: false, condLabel: '', condFormula: '' },
   }),
   items: () => ({ name: '', qty: 1, desc: '' }),
-  traits: () => ({ source: '', name: '', desc: '' }),
+  // auto：從職業 / 子職自動加入的特性種類（class / foundation / specialization / mastery），手動新增的為空字串
+  traits: () => ({ source: '', name: '', desc: '', auto: '' }),
 };
 
 function blankCharacter() {

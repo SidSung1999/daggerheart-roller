@@ -92,7 +92,9 @@ const Sheet = (() => {
     const c = ch();
     const maxLv = lib.maxLevel == null ? Number(c.level) || 1 : lib.maxLevel;
     const q = lib.q.trim().toLowerCase();
-    const mine = c.domains.filter((d) => d && d.trim());
+    // 兼職時，職業 Ⅱ 的兩個領域也列入（實際只能選其中一個，由玩家決定）
+    const cls2 = findClass(c.class2);
+    const mine = [...c.domains, ...(cls2 ? cls2.domains : [])].filter((d) => d && d.trim());
     return DOMAIN_CARDS.map((card, idx) => ({ card, idx })).filter(({ card }) => {
       if (card.level > maxLv) return false;
       if (lib.domain === 'mine') {
@@ -190,6 +192,128 @@ const Sheet = (() => {
     </div>`;
   }
 
+  /* ---------- 職業 / 子職 ---------- */
+  // 用下拉選單而不是輸入框＋清單：瀏覽器的輸入清單會依已填的文字過濾選項，
+  // 欄位有值時只剩一個選項，看起來像「選項沒有跟著職業變」。
+  const CUSTOM = '__custom__';
+  const opt = (value, label, selected) =>
+    `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`;
+
+  function classSelect(slot, exclude) {
+    const current = String(ch()[slot] || '').trim();
+    const known = findClass(current);
+    let h = opt('', '— 未選擇 —', !current);
+    CLASSES.filter((c) => !exclude || c.name !== exclude.name).forEach((c) => {
+      h += opt(c.name, c.name, known && known.name === c.name);
+    });
+    if (current && !known) h += opt(current, `${current}（自訂）`, true);
+    return `<select data-pick="${slot}">${h}${opt(CUSTOM, '自訂…', false)}</select>`;
+  }
+
+  // 職業已選時只列該職業的子職；還沒選職業時，依職業分組列出全部子職
+  function subSelect(slot, cls) {
+    const current = String(ch()[slot] || '').trim();
+    const known = findSubclass(current, cls && cls.name);
+    let h = opt('', '— 未選擇 —', !current);
+    if (cls) {
+      subclassesOf(cls.name).forEach((s) => (h += opt(s.name, s.name, known && known.name === s.name)));
+    } else {
+      CLASSES.forEach((k) => {
+        const inner = subclassesOf(k.name).map((s) => opt(s.name, s.name, known && known.name === s.name)).join('');
+        h += `<optgroup label="${esc(k.name)}">${inner}</optgroup>`;
+      });
+    }
+    if (current && !known) h += opt(current, `${current}（自訂）`, true);
+    return `<select data-pick="${slot}">${h}${opt(CUSTOM, '自訂…', false)}</select>`;
+  }
+
+  // 子職的專精、大師特性要到升級時才取得，所以交給玩家按鈕加入
+  function subActions() {
+    const c = ch();
+    const row = (title, sub, slot) =>
+      sub
+        ? `<div class="sub-actions">
+      <span>${title}：${esc(sub.name)}</span>
+      <button type="button" class="add" data-subup="specialization" data-subslot="${slot}">＋ 加入專精特性</button>
+      <button type="button" class="add" data-subup="mastery" data-subslot="${slot}">＋ 加入大師特性</button>
+    </div>`
+        : '';
+    return row('子職 Ⅰ', currentSubclass(c), 1) + row('兼職子職', currentSubclass2(c), 2);
+  }
+
+  // 職業 / 子職下拉選單的選擇結果。slot：class1 / sub1 / class2 / sub2
+  function onPick(slot, value) {
+    const c = ch();
+    let msg = '';
+
+    if (value === CUSTOM) {
+      // 自訂（團務獨創的職業等）：只記錄名稱，不帶入任何資料
+      const t = prompt('請輸入自訂名稱：');
+      value = t ? t.trim() : '';
+      if (!value) return renderAll(); // 取消：選單回到原本的值
+    }
+
+    if (slot === 'class1') {
+      const cls = findClass(value);
+      if (cls) {
+        applyClass(c, cls);
+        msg = `已套用職業「${cls.name}」：閃避 ${cls.evasion}、HP ${cls.hp}、領域 ${cls.domains.join(' / ')}`;
+      } else {
+        c.class1 = value;
+      }
+    } else if (slot === 'sub1') {
+      const sub = findSubclass(value, findClass(c.class1)?.name);
+      if (sub) {
+        // 子職屬於另一個職業（或還沒選職業）時，連職業一起帶入
+        const cls = findClass(c.class1);
+        if (!cls || classKey(cls.name) !== classKey(sub.class)) applyClass(c, findClass(sub.class));
+        applySubclass(c, sub);
+        msg = `已套用子職「${sub.name}」的基礎特性（施法屬性：${sub.spellAttr}）`;
+      } else {
+        c.sub1 = value;
+        if (!value) clearSubclassTraits(c);
+      }
+    } else if (slot === 'class2') {
+      const cls = findClass(value);
+      if (cls) {
+        applyClass2(c, cls);
+        msg = `兼職「${cls.name}」：已加入職業特性，可從 ${cls.domains.join(' 或 ')} 挑領域卡（領域卡庫的「我的領域」已一併列出）`;
+      } else {
+        c.class2 = value;
+        clearClass2Traits(c); // 不再是認得的職業，原本帶入的職業特性也移除
+        if (!value) {
+          c.sub2 = '';
+          clearMulticlassTraits(c);
+        }
+      }
+    } else if (slot === 'sub2') {
+      const sub = findSubclass(value, findClass(c.class2)?.name);
+      if (sub) {
+        const cls = findClass(c.class2);
+        if (!cls || classKey(cls.name) !== classKey(sub.class)) applyClass2(c, findClass(sub.class));
+        applySubclass2(c, sub);
+        msg = `已加入兼職子職「${sub.name}」的基礎特性`;
+      } else {
+        c.sub2 = value;
+        if (!value) clearMulticlassTraits(c);
+      }
+    }
+
+    Store.save();
+    renderAll(); // 職業會影響閃避、領域、特性與下拉選項，整頁重畫
+    if (msg) toast(msg);
+  }
+
+  function onSubTier(kind, slot) {
+    const c = ch();
+    const sub = slot === 2 ? currentSubclass2(c) : currentSubclass(c);
+    if (!sub) return;
+    const n = applySubclassTier(c, sub, kind, slot);
+    Store.save();
+    render();
+    toast(n ? `已加入「${sub.name}」的${TIER_LABEL[kind]}特性` : `「${sub.name}」沒有${TIER_LABEL[kind]}特性資料`);
+  }
+
   /* ---------- 整體畫面 ---------- */
   function render() {
     const c = ch();
@@ -246,7 +370,7 @@ const Sheet = (() => {
         (t, i) => `<div class="list-row traits">
           ${text(`traits.${i}.source`, '來源')}
           ${text(`traits.${i}.name`, '名稱')}
-          ${text(`traits.${i}.desc`, '描述')}
+          ${area(`traits.${i}.desc`, 2, '描述')}
           <button type="button" class="x" data-del="traits.${i}" aria-label="刪除">✕</button>
         </div>`
       )
@@ -259,12 +383,12 @@ const Sheet = (() => {
         <div class="head-grid">
           ${field('角色', text('name'))}
           ${field('種族', text('ancestry'))}
-          ${field('職業 Ⅰ', text('class1'))}
-          ${field('職業 Ⅱ', text('class2'))}
+          ${field('職業 Ⅰ', classSelect('class1'))}
+          ${field('職業 Ⅱ（兼職）', classSelect('class2', findClass(c.class1)))}
           ${field('玩家', text('player'))}
           ${field('背景', text('background'))}
-          ${field('子職 Ⅰ', text('sub1'))}
-          ${field('子職 Ⅱ', text('sub2'))}
+          ${field('子職 Ⅰ', subSelect('sub1', findClass(c.class1)))}
+          ${field('子職 Ⅱ（兼職）', subSelect('sub2', findClass(c.class2)))}
         </div>
         <div class="level">等級${num('level', 'min="1" max="10"')}</div>
       </header>
@@ -372,6 +496,7 @@ const Sheet = (() => {
       ${section(
         '角色特性',
         `<div class="list-head traits"><span>來源</span><span>名稱</span><span>描述</span></div>${traits}
+         ${subActions()}
          <button type="button" class="add" data-add="traits">＋ 新增特性</button>`
       )}
     </div>`;
@@ -484,6 +609,12 @@ const Sheet = (() => {
         if (prefix === 'weapons.main') applyHandsRule();
       }
     }
+    // 選了職業 / 子職，自動帶入對應資料
+    if (el.dataset && el.dataset.pick) {
+      onPick(el.dataset.pick, el.value);
+      return;
+    }
+
     // 護甲名稱符合護甲清單時，自動帶入傷害閾值、特徵、護甲值
     if (el.dataset && el.dataset.armor) {
       const a = ARMORS.find((x) => x.name === el.value);
@@ -504,6 +635,11 @@ const Sheet = (() => {
   function onClick(e) {
     const btn = e.target.closest('button');
     if (!btn) return;
+
+    if (btn.dataset.subup) {
+      onSubTier(btn.dataset.subup, Number(btn.dataset.subslot) || 1);
+      return;
+    }
 
     if (btn.dataset.aadd !== undefined) {
       e.preventDefault();
