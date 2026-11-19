@@ -36,7 +36,8 @@ const TEMPLATES = {
     prepared: false,
     name: '',
     desc: '',
-    fx: { target: 'none', formula: '', scaleProf: false, condLabel: '', condFormula: '' },
+    // perUnit：效果依擲骰時消耗的資源量 N 重複（公式乘以 N）；unitDiceOnly：只乘第一組骰子，固定加值只算一次；unitSpellcast：N 預設帶入施法屬性值（依子職業的施法屬性）；unitLabel 是資源名稱；unitMax 是 N 的上限（0 為不限）
+    fx: { target: 'none', formula: '', scaleProf: false, condLabel: '', condFormula: '', perUnit: false, unitDiceOnly: false, unitSpellcast: false, unitLabel: '', unitMax: 0 },
   }),
   items: () => ({ name: '', qty: 1, desc: '' }),
   // auto：從職業 / 子職自動加入的特性種類（class / foundation / specialization / mastery），手動新增的為空字串

@@ -340,3 +340,24 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
 }
 
 .gs-form { display: grid; gap: 10px; margin-top: 10px; }
+
+/* 依消耗資源決定次數的欄位 */
+.unit { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.opt .unit span, .spell .unit span { flex: none; }
+.unit input { width: 58px; padding: 3px 6px; text-align: center; }
+.unit-auto { font-style: normal; color: var(--gold); font-size: 0.72rem; cursor: help; }
+
+/* ---------- 自由擲骰 ---------- */
+.free { max-width: 640px; margin: 0 auto; }
+.fr-formula { font-family: monospace; font-size: 1.1rem; text-align: center; margin-bottom: 10px; }
+.fr-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.fr-quick button, .fr-clear { background: var(--field); color: var(--text); border: 1px solid var(--line2); border-radius: 6px; padding: 6px 12px; font-size: 0.85rem; }
+.fr-quick button:hover, .fr-clear:hover { border-color: var(--gold); color: var(--gold); }
+.fr-clear { margin-left: auto; padding: 3px 10px; font-size: 0.75rem; }
+.fr-duality { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+.fr-log { list-style: none; max-height: 320px; overflow-y: auto; font-size: 0.85rem; }
+.fr-log li { padding: 5px 0; border-bottom: 1px solid var(--line); font-family: monospace; }
+.fr-time { color: var(--muted); }
+.fr-total { color: var(--gold); font-weight: bold; font-size: 1rem; }
+.fr-log small { color: var(--muted); }
+@media (max-width: 600px) { .fr-duality { grid-template-columns: 1fr 1fr; } }

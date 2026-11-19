@@ -13,7 +13,7 @@ const Roller = (() => {
   const signed = (n) => (n >= 0 ? '+' : '') + n;
   const flatTerm = (n) => ({ kind: 'flat', sign: n < 0 ? -1 : 1, value: Math.abs(n) });
 
-  const newCheckState = () => ({ attr: null, adv: false, exp: {}, cards: {}, cond: {}, extra: '' });
+  const newCheckState = () => ({ attr: null, adv: false, exp: {}, cards: {}, cond: {}, units: {}, extra: '' });
 
   function S() {
     const id = ch().id;
@@ -21,7 +21,7 @@ const Roller = (() => {
       states[id] = {
         action: newCheckState(),
         reaction: newCheckState(),
-        damage: { src: 'weapons.main', cards: {}, cond: {}, spellCond: {}, extra: '' },
+        damage: { src: 'weapons.main', cards: {}, cond: {}, spellCond: {}, units: {}, extra: '' },
       };
     }
     return states[id];
@@ -43,6 +43,51 @@ const Roller = (() => {
       .filter(({ card }) => card.prepared && card.fx.target === target);
   }
 
+  // 這張卡施法時使用的施法屬性：預設用子職業 Ⅰ 的施法屬性；
+  // 卡片屬於兼職職業的領域、而不屬於主職業的領域時，改用子職業 Ⅱ 的施法屬性。
+  // 找不到（沒選子職業，或子職業的施法屬性是「無」）時回傳 null。
+  function spellcastInfo(card) {
+    const c = ch();
+    const inDomain = (cls) => !!cls && cls.domains.some((d) => classKey(d) === classKey(card.domain));
+    const second = currentSubclass2(c);
+    const sub = second && inDomain(findClass(c.class2)) && !inDomain(findClass(c.class1)) ? second : currentSubclass(c);
+    const attr = sub && ATTRS.find((a) => a.label === sub.spellAttr);
+    return attr ? { label: attr.label, value: Number(c.attrs[attr.key].value) || 0 } : null;
+  }
+
+  // 依消耗資源決定次數的卡（fx.perUnit）：目前填的 N，至少 1，有設上限就不超過上限。
+  // 還沒填過 N、而且卡片設定為「預設帶入施法屬性值」時，N 先用施法屬性值。
+  function unitCount(st, i, card) {
+    const auto = card.fx.unitSpellcast ? spellcastInfo(card) : null;
+    let n = Math.max(1, Math.floor(Number(st.units[i]) || (auto ? auto.value : 1)));
+    const max = Math.floor(Number(card.fx.unitMax) || 0);
+    if (max > 0) n = Math.min(n, max);
+    return n;
+  }
+
+  // 公式乘以 N（unitDiceOnly 時只乘第一組骰子）；骰子總數超過上限時回報錯誤
+  function scaleByUnit(terms, card, n, errors) {
+    const diceOnly = !!card.fx.unitDiceOnly;
+    const firstDice = terms.find((t) => t.kind === 'dice' && t.sign > 0);
+    const tooMany = diceOnly ? firstDice && firstDice.count * n > Dice.MAX_COUNT : terms.some((t) => t.kind === 'dice' && t.count * n > Dice.MAX_COUNT);
+    if (tooMany) {
+      errors.push(`${card.name || '領域卡'}：骰子數量超過上限 ${Dice.MAX_COUNT}，請減少 ${card.fx.unitLabel || '次數'}`);
+      return terms;
+    }
+    return diceOnly ? Dice.scaleFirstDice(terms, n) : Dice.multiply(terms, n);
+  }
+
+  const unitInput = (st, i, card) => {
+    const max = Math.floor(Number(card.fx.unitMax) || 0);
+    const auto = card.fx.unitSpellcast ? spellcastInfo(card) : null;
+    const hint = card.fx.unitSpellcast
+      ? auto
+        ? `<em class="unit-auto" title="自動帶入：施法屬性 ${esc(auto.label)} = ${auto.value}（可自行修改）">（${esc(auto.label)} ${auto.value}）</em>`
+        : `<em class="unit-auto" title="找不到施法屬性：請先在表頭選好子職業，或子職業沒有施法屬性">（無施法屬性）</em>`
+      : '';
+    return `<span class="unit"><span>${esc(card.fx.unitLabel || '次數')}</span>×<input type="number" min="1" ${max > 0 ? `max="${max}"` : ''} value="${unitCount(st, i, card)}" data-act="unit" data-i="${i}" aria-label="${esc(card.fx.unitLabel || '次數')}">${hint}</span>`;
+  };
+
   function cardItems(target, st, errors) {
     const prof = Number(ch().proficiency) || 1;
     const items = [];
@@ -52,7 +97,13 @@ const Roller = (() => {
       let terms = parseOrErr(card.fx.formula, name, errors);
       if (terms && terms.length) {
         if (card.fx.scaleProf) terms = Dice.scaleFirstDice(terms, prof);
-        items.push({ label: name, terms });
+        let label = name;
+        if (card.fx.perUnit) {
+          const n = unitCount(st, i, card);
+          terms = scaleByUnit(terms, card, n, errors);
+          label = `${name}（×${n}${card.fx.unitLabel ? ' ' + card.fx.unitLabel : ''}）`;
+        }
+        items.push({ label, terms });
       }
       if (st.cond[i] && card.fx.condFormula) {
         const ct = parseOrErr(card.fx.condFormula, `${name}（條件）`, errors);
@@ -143,7 +194,7 @@ const Roller = (() => {
       .map(({ card, i }) => {
         const f = card.fx;
         let h = optionRow(
-          `<span>${esc(card.name || '領域卡')}</span><code>${esc(f.formula || '—')}${f.scaleProf ? '（×熟練值）' : ''}</code>`,
+          `<span>${esc(card.name || '領域卡')}</span><code>${esc(f.formula || '—')}${f.scaleProf ? '（×熟練值）' : ''}${f.perUnit ? '（每單位）' : ''}</code>${f.perUnit ? unitInput(st, i, card) : ''}`,
           !!st.cards[i],
           `data-act="card" data-i="${i}"`
         );
@@ -209,7 +260,7 @@ const Roller = (() => {
               ? optionRow(`<span>＋ ${esc(f.condLabel || '條件成立')}</span><code>+${esc(f.condFormula)}</code>`, !!st.spellCond[i], `data-act="spellCond" data-i="${i}"`)
               : '';
             return `<div class="spell"><div class="spell-head"><b>${esc(card.name || '法術')}</b>
-              <code>${esc(f.formula)}${f.scaleProf ? '（×熟練值）' : ''}</code>
+              <code>${esc(f.formula)}${f.scaleProf ? '（×熟練值）' : ''}${f.perUnit ? '（每單位）' : ''}</code>${f.perUnit ? unitInput(st, i, card) : ''}
               <button type="button" class="mini-roll" data-act="spell" data-i="${i}">擲</button></div>${cond}</div>`;
           })
           .join('')
@@ -307,7 +358,13 @@ const Roller = (() => {
     let t = parseOrErr(card.fx.formula, card.name || '法術', errors);
     if (t && t.length) {
       if (card.fx.scaleProf) t = Dice.scaleFirstDice(t, prof);
-      items.push({ label: card.name || '法術', terms: t });
+      let label = card.name || '法術';
+      if (card.fx.perUnit) {
+        const n = unitCount(st, i, card);
+        t = scaleByUnit(t, card, n, errors);
+        label = `${label}（×${n}${card.fx.unitLabel ? ' ' + card.fx.unitLabel : ''}）`;
+      }
+      items.push({ label, terms: t });
     } else if (!errors.length) {
       errors.push(`${card.name || '法術'} 沒有填寫公式`);
     }
@@ -364,10 +421,11 @@ const Roller = (() => {
     else if (act === 'spellCond') st.spellCond[i] = el.checked;
     else if (act === 'extra') st.extra = el.value;
     else if (act === 'src') st.src = el.value;
+    else if (act === 'unit') st.units[i] = el.value;
     else return;
 
     const label = el.closest('.opt');
-    if (label) label.classList.toggle('on', el.checked);
+    if (label && el.type === 'checkbox') label.classList.toggle('on', el.checked);
     updatePreview();
   }
 

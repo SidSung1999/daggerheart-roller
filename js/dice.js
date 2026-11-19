@@ -40,6 +40,13 @@ const Dice = (() => {
     return { ok: true, terms };
   }
 
+  // 整個公式重複 n 次：骰子數量與固定加值都乘以 n。例如 1d20+2 乘 3 變成 3d20+6。
+  // 呼叫前要先確認骰子數量不會超過 MAX_COUNT（超過的會被截到上限）。
+  function multiply(terms, n) {
+    const k = Math.max(1, Math.floor(n) || 1);
+    return terms.map((t) => (t.kind === 'dice' ? { ...t, count: Math.min(t.count * k, MAX_COUNT) } : { ...t, value: t.value * k }));
+  }
+
   // 轉回字串，開頭不帶 +
   function format(terms) {
     const out = terms
@@ -82,7 +89,7 @@ const Dice = (() => {
     return { total, text: pieces.join('　') };
   }
 
-  return { roll, parse, format, scaleFirstDice, rollTerms };
+  return { roll, parse, format, scaleFirstDice, multiply, rollTerms, MAX_COUNT };
 })();
 
 if (typeof module !== 'undefined') module.exports = Dice;

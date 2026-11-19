@@ -200,6 +200,11 @@ const Sheet = (() => {
           <label>作用<select data-bind="${p}.fx.target">${opts}</select></label>
           <label>公式<input type="text" data-bind="${p}.fx.formula" value="${esc(card.fx.formula)}" placeholder="例：d8+2 或 d12"></label>
           <label class="inline">${check(p + '.fx.scaleProf')} 第一組骰子的數量乘以熟練值</label>
+          <label class="inline">${check(p + '.fx.perUnit')} 依消耗的資源決定次數：公式乘以 N，N 在擲骰時填</label>
+          <label class="inline">${check(p + '.fx.unitDiceOnly')} 只乘第一組骰子（固定加值只算一次，例如 d8+6 變成 Nd8+6）</label>
+          <label class="inline">${check(p + '.fx.unitSpellcast')} N 預設帶入施法屬性值（依子職業的施法屬性，擲骰時仍可修改）</label>
+          <label>資源名稱（選填）<input type="text" data-bind="${p}.fx.unitLabel" value="${esc(card.fx.unitLabel)}" placeholder="例：標記的壓力點"></label>
+          <label>N 的上限（選填，0 為不限）${num(p + '.fx.unitMax', 'min="0"')}</label>
           <label>條件說明<input type="text" data-bind="${p}.fx.condLabel" value="${esc(card.fx.condLabel)}" placeholder="例：目標處於脆弱"></label>
           <label>條件成立時追加<input type="text" data-bind="${p}.fx.condFormula" value="${esc(card.fx.condFormula)}" placeholder="例：1d8"></label>
         </div>
