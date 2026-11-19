@@ -338,3 +338,5 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
 @media (max-width: 900px) {
   .up-tiers { grid-template-columns: 1fr; }
 }
+
+.gs-form { display: grid; gap: 10px; margin-top: 10px; }

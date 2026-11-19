@@ -48,6 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
   Sheet.init();
   Roller.init();
   LevelUp.init();
+  GsImport.init();
+  document.getElementById('btnGs').addEventListener('click', () => GsImport.open());
   renderAll();
 
   document.querySelectorAll('.main-tabs button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
