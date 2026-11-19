@@ -17,6 +17,7 @@
     <button type="button" id="btnExport">匯出</button>
     <button type="button" id="btnImport">匯入</button>
     <button type="button" id="btnGs" title="從 Google 試算表的「匯出頁」匯入成新角色">Google 匯入</button>
+    <button type="button" id="btnRoom" title="加入共享房間，和同桌的人即時看到彼此的擲骰">🌐 房間</button>
     <input type="file" id="fileImport" accept="application/json,.json" hidden>
   </div>
   <nav class="main-tabs">
@@ -34,6 +35,8 @@
 
 <div id="levelup" class="lu-overlay" hidden></div>
 <div id="gsimport" class="lu-overlay" hidden></div>
+<div id="roomdlg" class="lu-overlay" hidden></div>
+<aside id="roomdock" class="rd" hidden aria-label="共享擲骰紀錄"></aside>
 <div id="toast" role="status"></div>
 <datalist id="weaponList"></datalist>
 <datalist id="mainWeaponList"></datalist>
@@ -63,6 +66,8 @@
 <script src="js/sheet.js"></script>
 <script src="js/roller.js"></script>
 <script src="js/freeroll.js"></script>
+<script src="js/room-firebase.js"></script>
+<script src="js/room.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

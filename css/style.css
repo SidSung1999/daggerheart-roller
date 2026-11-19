@@ -361,3 +361,36 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
 .fr-total { color: var(--gold); font-weight: bold; font-size: 1rem; }
 .fr-log small { color: var(--muted); }
 @media (max-width: 600px) { .fr-duality { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- 共享擲骰房間 ---------- */
+.rd { position: fixed; right: 12px; bottom: 12px; width: 340px; max-width: calc(100vw - 24px); background: var(--panel); border: 1px solid var(--gold); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.5); z-index: 30; }
+.rd[hidden] { display: none; }
+.rd-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; }
+.rd-toggle { background: none; border: none; color: var(--gold); font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+.rd-badge { background: var(--fear); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 0.72rem; }
+.rd-people { font-size: 0.75rem; color: var(--muted); }
+.rd-body { border-top: 1px solid var(--line); padding: 8px 10px 10px; }
+.rd-body[hidden] { display: none; }
+.rd-tools { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; margin-bottom: 4px; }
+.rd-tools label { display: flex; align-items: center; gap: 6px; }
+.rd-tools button { background: none; border: 1px solid var(--line2); color: var(--muted); border-radius: 6px; padding: 2px 10px; font-size: 0.75rem; }
+.rd-who { font-size: 0.72rem; margin-bottom: 6px; word-break: break-all; }
+.rd-log { list-style: none; max-height: 320px; overflow-y: auto; }
+.rd-item { border-bottom: 1px solid var(--line); font-size: 0.82rem; }
+.rd-item summary { cursor: pointer; padding: 5px 0; line-height: 1.5; }
+.rd-item.mine summary b { color: var(--gold); }
+.rd-item.live { animation: rd-flash 1.6s ease-out 1; }
+@keyframes rd-flash { from { background: rgba(201,168,76,0.35); } to { background: transparent; } }
+.rd-time { color: var(--muted); font-family: monospace; font-size: 0.72rem; }
+.rd-total { color: var(--gold); font-weight: bold; font-size: 1rem; }
+.rd-item small { color: var(--muted); }
+.rd-detail { padding: 0 0 8px 4px; }
+.rd-detail pre { white-space: pre-wrap; word-break: break-word; font-family: monospace; font-size: 0.78rem; color: #b0b0c0; }
+.rd-dice { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; font-size: 0.78rem; }
+.rd-dice .hope { color: var(--hope); }
+.rd-dice .fear { color: var(--fear); }
+.verdict-tag { font-size: 0.7rem; padding: 1px 8px; border-radius: 10px; white-space: nowrap; }
+.verdict-tag.hope { background: #1a2e1a; color: var(--hope); }
+.verdict-tag.fear { background: #2e1a1a; color: var(--fear); }
+.verdict-tag.crit { background: #2e2a1a; color: var(--gold); }
+@media (max-width: 600px) { .rd { right: 6px; bottom: 6px; width: calc(100vw - 12px); } }

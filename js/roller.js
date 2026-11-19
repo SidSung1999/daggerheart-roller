@@ -299,12 +299,14 @@ const Roller = (() => {
   /* ---------- 擲骰與結果 ---------- */
   function rollItems(items) {
     let total = 0;
+    const plain = []; // 純文字版本，送到共享房間用
     const lines = items.map((it) => {
       const r = Dice.rollTerms(it.terms);
       total += r.total;
+      plain.push(`${it.label}：${r.text}`);
       return `<div><span class="lbl">${esc(it.label)}</span> ${esc(r.text)}</div>`;
     });
-    return { total, lines };
+    return { total, lines, plain };
   }
 
   function showErrors(errors) {
@@ -324,6 +326,14 @@ const Roller = (() => {
     if (hope === fear) verdict = '<div class="verdict crit">✨ 關鍵成功！（Critical）</div>';
     else if (hope > fear) verdict = '<div class="verdict hope">☀ 帶著希望</div>';
     else verdict = '<div class="verdict fear">🌑 帶著恐懼</div>';
+    const attr = ATTRS.find((a) => a.key === S()[mode].attr);
+    Room.publish({
+      kind: 'check',
+      title: `${mode === 'action' ? '動作檢定' : '反應檢定'}${attr ? '・' + attr.label : ''}`,
+      lines: [`希望骰：${hope}`, `恐懼骰：${fear}`, ...r.plain],
+      total,
+      dice: { hope, fear, hs: 12, fs: 12, v: hope === fear ? 'crit' : hope > fear ? 'hope' : 'fear' },
+    });
 
     root().querySelector('#result').innerHTML = `
       <div class="result">
@@ -341,6 +351,7 @@ const Roller = (() => {
     const { items, errors } = collectDamage();
     if (errors.length) return showErrors(errors);
     const r = rollItems(items);
+    Room.publish({ kind: 'damage', title: `傷害・${items[0] ? items[0].label : '武器'}`, lines: r.plain, total: r.total });
     root().querySelector('#result').innerHTML = `
       <div class="result">
         <div class="breakdown">${r.lines.join('')}</div>
@@ -374,6 +385,7 @@ const Roller = (() => {
     }
     if (errors.length) return showErrors(errors);
     const r = rollItems(items);
+    Room.publish({ kind: 'spell', title: `法術・${card.name || '法術'}`, lines: r.plain, total: r.total });
     root().querySelector('#result').innerHTML = `
       <div class="result">
         <div class="result-title">${esc(card.name || '法術')}</div>

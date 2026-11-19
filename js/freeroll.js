@@ -117,6 +117,7 @@ const FreeRoll = (() => {
       <div class="total">${rolled.total}</div><small class="muted">總計</small>
     </div>`;
     log(label, rolled.total);
+    Room.publish({ kind: 'free', title: `自由擲骰・${label}`, lines: rolled.text.split('　'), total: rolled.total });
   }
 
   function rollDuality() {
@@ -152,7 +153,15 @@ const FreeRoll = (() => {
       <div class="breakdown">${lines.map((x) => `<div>${esc(x)}</div>`).join('')}</div>
       <div class="total">${total}</div><small class="muted">總計</small>
     </div>`;
-    log(`二元骰 d${hopeSides}+d${fearSides}${mod ? signed(mod) : ''}${adv ? (adv > 0 ? ' 優勢' : ' 劣勢') : ''}`, total, `${hope} / ${fear}　${verdictText}`);
+    const title = `二元骰 d${hopeSides}+d${fearSides}${mod ? signed(mod) : ''}${adv ? (adv > 0 ? ' 優勢' : ' 劣勢') : ''}`;
+    log(title, total, `${hope} / ${fear}　${verdictText}`);
+    Room.publish({
+      kind: 'duality',
+      title: `自由擲骰・${title}`,
+      lines,
+      total,
+      dice: { hope, fear, hs: hopeSides, fs: fearSides, v: hope === fear ? 'crit' : hope > fear ? 'hope' : 'fear' },
+    });
   }
 
   /* ---------- 事件 ---------- */

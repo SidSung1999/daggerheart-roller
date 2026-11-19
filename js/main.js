@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Roller.init();
   LevelUp.init();
   FreeRoll.init();
+  Room.init();
   GsImport.init();
   document.getElementById('btnGs').addEventListener('click', () => GsImport.open());
   renderAll();
