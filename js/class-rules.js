@@ -48,7 +48,7 @@ function splitTraits(text) {
 // 自動加入的特性以 auto 欄位標記種類，之後換職業 / 子職時可以只替換這些列，不動玩家自己寫的。
 // 子職 Ⅰ 用 foundation / specialization / mastery；兼職（職業 Ⅱ、子職 Ⅱ）用 class2 與 multiclass 系列。
 const AUTO_ORDER = [
-  'ancestry', 'background',
+  'ancestry', 'background', 'transformation',
   'class', 'foundation', 'specialization', 'mastery',
   'class2', 'multiclass', 'multiclass-specialization', 'multiclass-mastery',
 ];
@@ -76,8 +76,9 @@ const clearClass2Traits = (c) => removeAuto(c, ['class2']); // 職業 Ⅱ 的職
 // 套用職業：閃避、HP、領域、希望特性、職業特性。換成別的職業時，原本屬於其他職業的子職會被清掉。
 function applyClass(c, cls) {
   c.class1 = cls.name;
-  c.evasion = cls.evasion;
-  c.hpMax = cls.hp;
+  // 職業給的是 1 級的基礎值；升級選過的「閃避 / HP 上限」要保留，所以加回升級紀錄裡的次數
+  c.evasion = cls.evasion + upgradeTotal(c, 'evasion');
+  c.hpMax = cls.hp + upgradeTotal(c, 'hp');
   c.domains = [...cls.domains];
   c.hopeFeature = cls.hopeFeature;
   setAutoTraits(c, 'class', splitTraits(cls.features).map((t) => ({ source: '職業', ...t })));

@@ -12,6 +12,11 @@ function findBackground(text) {
   return k ? BACKGROUNDS.find((b) => classKey(b.name) === k) : undefined;
 }
 
+function findTransformation(text) {
+  const k = classKey(text);
+  return k ? TRANSFORMATIONS.find((t) => classKey(t.name) === k) : undefined;
+}
+
 const isMixedAncestry = (text) => !!findAncestry(text)?.mixed;
 
 // 一般種族可以拿來混合（排除「混合血統」本身）
@@ -42,6 +47,12 @@ function applyMix(c) {
     { source: `種族・${classKey(b.name)}`, name: b.abilities[1].name, desc: b.abilities[1].desc },
   ]);
   return true;
+}
+
+// 套用轉變：兩個轉變能力加入角色特性
+function applyTransformation(c, t) {
+  c.transformation = t.name;
+  setAutoTraits(c, 'transformation', t.abilities.map((ab) => ({ source: '轉變', name: ab.name, desc: ab.desc })));
 }
 
 // 套用背景：背景能力加入角色特性

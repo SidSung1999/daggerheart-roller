@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   Sheet.init();
   Roller.init();
+  LevelUp.init();
   renderAll();
 
   document.querySelectorAll('.main-tabs button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));

@@ -86,6 +86,7 @@ function blankCharacter() {
     armor: { name: '', baseThreshold: '', features: '', baseScore: '' },
     domains: ['', ''],
     domains2: ['', ''], // 兼職（職業 Ⅱ）的兩個領域，選了職業 Ⅱ 會自動帶入
+    upgrades: blankUpgrades(), // 升級紀錄：各階級選過哪些升級選項（見 levelup.js）
     ancestryMix: ['', ''], // 混合血統：特性 1、特性 2 各取自哪個種族
     ancestryMixName: '', // 混合血統的自創種族名稱
     domainCards: [],

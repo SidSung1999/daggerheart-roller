@@ -84,7 +84,7 @@ main { padding: 16px; max-width: 1200px; margin: 0 auto; }
 
 /* ---------- 角色卡 ---------- */
 .sheet-head {
-  display: grid; grid-template-columns: 180px 1fr 90px; gap: 12px; align-items: stretch;
+  display: grid; grid-template-columns: 180px 1fr 100px; gap: 12px; align-items: stretch;
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 12px; margin-bottom: 14px;
 }
@@ -289,4 +289,52 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
   .mix-grid { grid-template-columns: 1fr; }
   .lib-filters { grid-template-columns: 1fr; }
   .lib-item summary { flex-wrap: wrap; }
+}
+
+/* ---------- 升級 ---------- */
+.levelup-btn { background: var(--gold); color: #1a1a2e; border: none; border-radius: 6px; padding: 5px 4px; font-weight: bold; font-size: 0.78rem; width: 100%; }
+.levelup-btn:hover { box-shadow: 0 2px 10px rgba(201,168,76,0.4); }
+.warn { color: #f0a030; font-style: normal; }
+
+.up-log > summary { cursor: pointer; color: var(--gold); font-weight: bold; }
+.up-log > p { margin: 8px 0; }
+.up-tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.up-tier h3 { font-size: 0.82rem; color: var(--gold); margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px; }
+.up-count { font-size: 0.72rem; color: var(--muted); font-weight: normal; }
+.up-count.warn { color: #f0a030; }
+.up-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; font-size: 0.78rem; line-height: 1.4; }
+.up-boxes { display: flex; gap: 3px; min-width: 56px; padding-top: 1px; }
+.ubox { width: 16px; height: 16px; border-radius: 3px; background: var(--field); border: 2px solid var(--line2); padding: 0; }
+.ubox:hover { border-color: var(--gold); }
+.ubox.on { background: var(--gold); border-color: var(--gold); }
+
+.lu-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: flex-start; justify-content: center; padding: 24px 12px; overflow-y: auto; z-index: 40; }
+.lu-overlay[hidden] { display: none; }
+.lu-modal { background: var(--panel); border: 1px solid var(--gold); border-radius: 12px; padding: 18px; width: 100%; max-width: 640px; }
+.lu-modal h2 { color: var(--gold); font-size: 1.1rem; margin-bottom: 10px; }
+.lu-modal h2 small { color: var(--muted); font-weight: normal; }
+.lu-start { background: var(--gold-bg); border: 1px solid var(--gold); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 0.85rem; }
+.lu-start ul, .lu-list { margin: 4px 0 0 18px; line-height: 1.7; font-size: 0.85rem; }
+.lu-list.todo { color: #f0c060; }
+.lu-warn { background: #2a1e00; border: 1px solid #f0a030; border-radius: 8px; padding: 8px 12px; color: #f0a030; font-size: 0.8rem; margin-bottom: 10px; }
+.lu-title { margin: 10px 0 6px; font-size: 0.85rem; }
+.lu-opt { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 0.82rem; line-height: 1.4; }
+.lu-opt.on { border-color: var(--gold); background: var(--gold-bg); }
+.lu-opt.off { opacity: 0.5; }
+.lu-step { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.lu-step button { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--line2); background: var(--panel); color: var(--text); }
+.lu-step button:disabled { opacity: 0.35; cursor: default; }
+.lu-pick { margin: 8px 0; font-size: 0.82rem; }
+.lu-chks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.lu-chk { display: flex; align-items: center; gap: 6px; background: var(--field); border: 1px solid var(--line2); border-radius: 6px; padding: 5px 10px; }
+.lu-chk.on { border-color: var(--gold); background: var(--gold-bg); }
+.lu-chk.off { opacity: 0.45; }
+.lu-err { color: #ff8a80; font-size: 0.8rem; min-height: 1.2em; margin-top: 8px; }
+.lu-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.lu-actions button { padding: 8px 18px; border-radius: 8px; border: 1px solid var(--line2); background: var(--field); color: var(--text); }
+.lu-actions button.primary { background: var(--gold); color: #1a1a2e; border-color: var(--gold); font-weight: bold; }
+.lu-actions button:disabled { opacity: 0.4; cursor: default; }
+
+@media (max-width: 900px) {
+  .up-tiers { grid-template-columns: 1fr; }
 }

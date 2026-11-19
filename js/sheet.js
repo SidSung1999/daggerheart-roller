@@ -323,6 +323,15 @@ const Sheet = (() => {
         c.ancestryMixName = '';
         removeAuto(c, ['ancestry']); // 不再是認得的種族，原本帶入的特性也移除
       }
+    } else if (slot === 'transformation') {
+      const t = findTransformation(value);
+      if (t) {
+        applyTransformation(c, t);
+        msg = `已套用轉變「${t.name}」：${t.abilities.map((x) => x.name).join('、')}`;
+      } else {
+        c.transformation = value;
+        removeAuto(c, ['transformation']);
+      }
     } else if (slot === 'background') {
       const b = findBackground(value);
       if (b) {
@@ -402,6 +411,7 @@ const Sheet = (() => {
     const prevLib = root().querySelector('#domainLib'); // 重畫前記住各個資料庫面板是否展開
     if (prevLib) lib.open = prevLib.open;
     WeaponLib.captureOpen(root());
+    LevelUp.captureOpen(root());
     ArmorLib.captureOpen(root());
     if (lib.charId !== c.id) {
       // 切換角色時，卡片庫的篩選條件回到預設
@@ -470,7 +480,7 @@ const Sheet = (() => {
           ${field('子職 Ⅰ', subSelect('sub1', findClass(c.class1)))}
           ${field('子職 Ⅱ（兼職）', subSelect('sub2', findClass(c.class2)))}
         </div>
-        <div class="level">等級${num('level', 'min="1" max="10"')}</div>
+        <div class="level">等級${num('level', 'min="1" max="10" title="直接修改等級只會改等級，不會套用升級效果；要升級請按下面的「升級」"')}<button type="button" class="levelup-btn" data-levelup>⬆ 升級</button></div>
       </header>
       ${mixRow()}
 
@@ -560,11 +570,13 @@ const Sheet = (() => {
          <button type="button" class="add" data-add="domainCards">＋ 新增自訂領域卡</button>`
       )}
 
+      ${LevelUp.recordHtml()}
+
       <div class="cols two">
         ${section('角色設定', area('backstory', 6))}
         <div class="col">
           ${section('個人資源', area('resources', 2))}
-          ${section('轉變', area('transformation', 2))}
+          ${section('轉變', originSelect('transformation', TRANSFORMATIONS, findTransformation))}
         </div>
       </div>
 
@@ -733,6 +745,16 @@ const Sheet = (() => {
     const btn = e.target.closest('button');
     if (!btn) return;
 
+    if (btn.dataset.levelup !== undefined) {
+      LevelUp.open();
+      return;
+    }
+
+    if (btn.dataset.upkey) {
+      LevelUp.toggleBox(btn.dataset.uptier, btn.dataset.upkey, btn.dataset.upi);
+      return;
+    }
+
     if (btn.dataset.subup) {
       onSubTier(btn.dataset.subup, Number(btn.dataset.subslot) || 1);
       return;
@@ -792,5 +814,14 @@ const Sheet = (() => {
     r.addEventListener('click', onClick);
   }
 
-  return { init, render };
+  // 升級完成後：展開領域卡庫並捲到那裡，方便接著選領域卡
+  function focusDomainLibrary() {
+    const panel = document.getElementById('domainLib');
+    if (panel) panel.open = true; // render() 開頭會讀取面板目前的展開狀態，所以要先改畫面上的
+    lib.open = true;
+    render();
+    document.getElementById('domainLib')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }
+
+  return { init, render, focusDomainLibrary };
 })();
