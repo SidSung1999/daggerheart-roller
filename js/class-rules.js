@@ -48,6 +48,7 @@ function splitTraits(text) {
 // 自動加入的特性以 auto 欄位標記種類，之後換職業 / 子職時可以只替換這些列，不動玩家自己寫的。
 // 子職 Ⅰ 用 foundation / specialization / mastery；兼職（職業 Ⅱ、子職 Ⅱ）用 class2 與 multiclass 系列。
 const AUTO_ORDER = [
+  'ancestry', 'background',
   'class', 'foundation', 'specialization', 'mastery',
   'class2', 'multiclass', 'multiclass-specialization', 'multiclass-mastery',
 ];
@@ -96,13 +97,13 @@ function applySubclass(c, sub) {
 }
 
 /* ---------- 兼職（職業 Ⅱ / 子職 Ⅱ） ----------
-   兼職不會改閃避、HP、領域欄位或希望特性。
-   選了職業 Ⅱ 會加入它的職業特性；選了子職 Ⅱ 會加入它的基礎特性；
-   專精、大師特性和子職 Ⅰ 一樣用按鈕加入。
-   領域則由領域卡庫的「我的領域」一併列出職業 Ⅱ 的領域供挑選。 */
+   兼職不會改閃避、HP、主職業的領域或希望特性。
+   選了職業 Ⅱ 會帶入它的兩個領域與職業特性；選了子職 Ⅱ 會加入它的基礎特性；
+   專精、大師特性和子職 Ⅰ 一樣用按鈕加入。 */
 
 function applyClass2(c, cls) {
   c.class2 = cls.name;
+  c.domains2 = [...cls.domains];
   setAutoTraits(c, 'class2', splitTraits(cls.features).map((t) => ({ source: '兼職・職業', ...t })));
 
   const known = findSubclass(c.sub2);

@@ -140,6 +140,12 @@ main { padding: 16px; max-width: 1200px; margin: 0 auto; }
 .add:hover { border-color: var(--gold); color: var(--gold); }
 .list-row.traits { align-items: start; }
 .list-row.traits textarea { field-sizing: content; line-height: 1.5; min-height: calc(2 * 1.5em + 14px); }
+.mix-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mix-rules { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+.mix-rules summary { cursor: pointer; }
+.mix-rules p { margin-top: 6px; line-height: 1.6; white-space: pre-line; color: #c0c0d0; }
+.multi-domain { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line2); }
+.multi-domain small { display: block; margin-bottom: 4px; color: var(--muted); font-size: 0.72rem; }
 .sub-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; color: var(--muted); font-size: 0.8rem; }
 .sub-actions .add { width: auto; margin-top: 0; padding: 4px 12px; }
 
@@ -280,6 +286,7 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
   .dcard-top { grid-template-columns: 1fr 1fr; }
   .fx-grid { grid-template-columns: 1fr; }
   .armor-grid { grid-template-columns: 1fr 1fr; }
+  .mix-grid { grid-template-columns: 1fr; }
   .lib-filters { grid-template-columns: 1fr; }
   .lib-item summary { flex-wrap: wrap; }
 }

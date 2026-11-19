@@ -3,12 +3,12 @@ const Sheet = (() => {
   const root = () => document.getElementById('sheet');
   const ch = () => Store.active();
 
-  // 勾選格軌道：已標記數量欄位、上限欄位（null 表示固定）、上限範圍
+  // 勾選格軌道：已標記數量欄位、上限來源（stat 見 stat-bonus.js；fixed 為固定格數）、上限範圍
   const TRACKS = {
-    hp: { marked: 'hpMarked', max: 'hpMax', min: 1, cap: 12, label: 'HP' },
-    stress: { marked: 'stressMarked', max: 'stressMax', min: 1, cap: 12, label: '壓力' },
-    hope: { marked: 'hopeMarked', max: null, fixed: 6, label: '希望' },
-    armor: { marked: 'armorMarked', max: 'armorSlots', min: 0, cap: 12, label: '護甲' },
+    hp: { marked: 'hpMarked', stat: 'hp', min: 1, cap: 12, label: 'HP' },
+    stress: { marked: 'stressMarked', stat: 'stress', min: 1, cap: 12, label: '壓力' },
+    hope: { marked: 'hopeMarked', fixed: 6, label: '希望' },
+    armor: { marked: 'armorMarked', stat: 'armor', min: 0, cap: 12, label: '護甲' },
   };
 
   const WEAPON_FIELDS = ['name', 'trait', 'features', 'range', 'damage', 'type', 'hands'];
@@ -24,6 +24,22 @@ const Sheet = (() => {
     `<input type="number" data-bind="${path}" data-type="number" value="${esc(val(path))}" ${extra}>`;
   const area = (path, rows = 3, ph = '') =>
     `<textarea data-bind="${path}" rows="${rows}" placeholder="${esc(ph)}">${esc(val(path))}</textarea>`;
+  // 顯示「基礎值 + 種族加成」的合計；輸入時反推基礎值存回去，滑鼠移上去顯示分項（title）
+  const totalNum = (stat, extra = '') => {
+    const c = ch();
+    return `<input type="number" data-bind="${STAT_FIELDS[stat]}" data-type="number" data-total="${stat}" value="${statTotal(c, stat)}" title="${esc(statTitle(c, stat))}" ${extra}>`;
+  };
+
+  // 就地更新所有合計欄位（例如熟練值改變時，加拉帕的傷害閾值加成會跟著變）
+  function refreshTotals() {
+    root().querySelectorAll('[data-total]').forEach((el) => {
+      const stat = el.dataset.total;
+      if (document.activeElement !== el) el.value = statTotal(ch(), stat);
+      el.title = statTitle(ch(), stat);
+    });
+    Object.keys(TRACKS).forEach((n) => TRACKS[n].stat && renderTrack(n));
+  }
+
   const check = (path, extra = '') =>
     `<input type="checkbox" data-bind="${path}" data-type="bool" ${getPath(ch(), path) ? 'checked' : ''} ${extra}>`;
   const field = (label, inner, cls = '') => `<label class="hf ${cls}"><span>${label}</span>${inner}</label>`;
@@ -34,7 +50,7 @@ const Sheet = (() => {
   function trackMax(name) {
     const t = TRACKS[name];
     if (t.fixed) return t.fixed;
-    const n = Math.floor(Number(ch()[t.max]) || 0);
+    const n = Math.floor(statTotal(ch(), t.stat)); // 基礎值加上種族加成
     return Math.max(t.min, Math.min(t.cap, n));
   }
 
@@ -92,9 +108,8 @@ const Sheet = (() => {
     const c = ch();
     const maxLv = lib.maxLevel == null ? Number(c.level) || 1 : lib.maxLevel;
     const q = lib.q.trim().toLowerCase();
-    // 兼職時，職業 Ⅱ 的兩個領域也列入（實際只能選其中一個，由玩家決定）
-    const cls2 = findClass(c.class2);
-    const mine = [...c.domains, ...(cls2 ? cls2.domains : [])].filter((d) => d && d.trim());
+    // 兼職時，職業 Ⅱ 的兩個領域也列入
+    const mine = [...c.domains, ...c.domains2].filter((d) => d && d.trim());
     return DOMAIN_CARDS.map((card, idx) => ({ card, idx })).filter(({ card }) => {
       if (card.level > maxLv) return false;
       if (lib.domain === 'mine') {
@@ -210,6 +225,41 @@ const Sheet = (() => {
     return `<select data-pick="${slot}">${h}${opt(CUSTOM, '自訂…', false)}</select>`;
   }
 
+  // 種族、背景下拉選單：做法與職業相同
+  function originSelect(slot, list, find) {
+    const current = String(ch()[slot] || '').trim();
+    const known = find(current);
+    let h = opt('', '— 未選擇 —', !current);
+    list.forEach((x) => (h += opt(x.name, x.name, known && known.name === x.name)));
+    if (current && !known) h += opt(current, `${current}（自訂）`, true);
+    return `<select data-pick="${slot}">${h}${opt(CUSTOM, '自訂…', false)}</select>`;
+  }
+
+  // 選了「混合血統」才出現：特性 1 取自一個種族、特性 2 取自另一個種族
+  function mixRow() {
+    const c = ch();
+    const mixed = findAncestry(c.ancestry);
+    if (!mixed || !mixed.mixed) return '';
+    const sel = (i, label) => {
+      const other = findAncestry(c.ancestryMix[1 - i]);
+      const cur = findAncestry(c.ancestryMix[i]);
+      let h = opt('', '— 選擇種族 —', !cur);
+      mixableAncestries()
+        .filter((a) => !other || a.name !== other.name)
+        .forEach((a) => (h += opt(a.name, `${classKey(a.name)}：${a.abilities[i].name}`, cur && cur.name === a.name)));
+      return `<label class="hf"><span>${label}</span><select data-mix="${i}">${h}</select></label>`;
+    };
+    const rules = mixed.rules.map((r) => `<p><b>${esc(r.name)}</b><br>${esc(r.desc)}</p>`).join('');
+    return `<section class="panel mix-row">
+      <h2>混合血統</h2>
+      <div class="mix-grid">
+        ${sel(0, '種族特性 1 取自')}${sel(1, '種族特性 2 取自')}
+        ${field('混合種族名稱', text('ancestryMixName', '例如：牙裔'))}
+      </div>
+      <details class="mix-rules"><summary>規則說明</summary>${rules}</details>
+    </section>`;
+  }
+
   // 職業已選時只列該職業的子職；還沒選職業時，依職業分組列出全部子職
   function subSelect(slot, cls) {
     const current = String(ch()[slot] || '').trim();
@@ -225,6 +275,13 @@ const Sheet = (() => {
     }
     if (current && !known) h += opt(current, `${current}（自訂）`, true);
     return `<select data-pick="${slot}">${h}${opt(CUSTOM, '自訂…', false)}</select>`;
+  }
+
+  // 兼職領域：選了職業 Ⅱ 會自動帶入它的兩個領域，也可以手動修改
+  function domains2Field() {
+    const c = ch();
+    if (!String(c.class2 || '').trim()) return '';
+    return `<div class="multi-domain"><small>兼職領域（${esc(c.class2)}）</small>${text('domains2.0', '領域 1', 'list="domainList"')}${text('domains2.1', '領域 2', 'list="domainList"')}</div>`;
   }
 
   // 子職的專精、大師特性要到升級時才取得，所以交給玩家按鈕加入
@@ -253,11 +310,33 @@ const Sheet = (() => {
       if (!value) return renderAll(); // 取消：選單回到原本的值
     }
 
-    if (slot === 'class1') {
+    if (slot === 'ancestry') {
+      const a = findAncestry(value);
+      if (a) {
+        applyAncestry(c, a);
+        msg = a.mixed
+          ? '混合血統：請在下方選擇特性 1、特性 2 各取自哪個種族'
+          : `已套用種族「${a.name}」：${a.abilities.map((x) => x.name).join('、')}`;
+      } else {
+        c.ancestry = value;
+        c.ancestryMix = ['', ''];
+        c.ancestryMixName = '';
+        removeAuto(c, ['ancestry']); // 不再是認得的種族，原本帶入的特性也移除
+      }
+    } else if (slot === 'background') {
+      const b = findBackground(value);
+      if (b) {
+        applyBackground(c, b);
+        msg = `已套用背景「${b.name}」：${b.ability}`;
+      } else {
+        c.background = value;
+        removeAuto(c, ['background']);
+      }
+    } else if (slot === 'class1') {
       const cls = findClass(value);
       if (cls) {
         applyClass(c, cls);
-        msg = `已套用職業「${cls.name}」：閃避 ${cls.evasion}、HP ${cls.hp}、領域 ${cls.domains.join(' / ')}`;
+        msg = `已套用職業「${cls.name}」：閃避 ${statTotal(c, 'evasion')}、HP ${statTotal(c, 'hp')}、領域 ${cls.domains.join(' / ')}`;
       } else {
         c.class1 = value;
       }
@@ -277,9 +356,10 @@ const Sheet = (() => {
       const cls = findClass(value);
       if (cls) {
         applyClass2(c, cls);
-        msg = `兼職「${cls.name}」：已加入職業特性，可從 ${cls.domains.join(' 或 ')} 挑領域卡（領域卡庫的「我的領域」已一併列出）`;
+        msg = `兼職「${cls.name}」：已帶入領域 ${cls.domains.join(' / ')} 與職業特性`;
       } else {
         c.class2 = value;
+        c.domains2 = ['', ''];
         clearClass2Traits(c); // 不再是認得的職業，原本帶入的職業特性也移除
         if (!value) {
           c.sub2 = '';
@@ -382,20 +462,21 @@ const Sheet = (() => {
         <div class="brand"><b>DAGGERHEART 匕首之心</b><small>CHARACTER SHEET 角色卡</small></div>
         <div class="head-grid">
           ${field('角色', text('name'))}
-          ${field('種族', text('ancestry'))}
+          ${field('種族', originSelect('ancestry', ANCESTRIES, findAncestry))}
           ${field('職業 Ⅰ', classSelect('class1'))}
           ${field('職業 Ⅱ（兼職）', classSelect('class2', findClass(c.class1)))}
           ${field('玩家', text('player'))}
-          ${field('背景', text('background'))}
+          ${field('背景', originSelect('background', BACKGROUNDS, findBackground))}
           ${field('子職 Ⅰ', subSelect('sub1', findClass(c.class1)))}
           ${field('子職 Ⅱ（兼職）', subSelect('sub2', findClass(c.class2)))}
         </div>
         <div class="level">等級${num('level', 'min="1" max="10"')}</div>
       </header>
+      ${mixRow()}
 
       <div class="stats">
-        <div class="stat-box"><span>閃避值</span>${num('evasion')}</div>
-        <div class="stat-box"><span>護甲值</span>${num('armorSlots', 'min="0" max="12"')}</div>
+        <div class="stat-box"><span>閃避值</span>${totalNum('evasion')}</div>
+        <div class="stat-box"><span>護甲值</span>${totalNum('armor', 'min="0" max="12"')}</div>
         ${attrBoxes}
       </div>
       <div class="armor-track"><span>護甲槽</span>${boxes('armor')}</div>
@@ -406,13 +487,13 @@ const Sheet = (() => {
             '傷害與健康',
             `<div class="thresholds">
               <div><small>輕度傷害 扣除 1 HP</small></div>
-              ${num('majorThreshold')}
+              ${totalNum('major')}
               <div><small>中度傷害 扣除 2 HP</small></div>
-              ${num('severeThreshold')}
+              ${totalNum('severe')}
               <div><small>嚴重傷害 扣除 3 HP</small></div>
             </div>
-            <div class="track-row"><b>HP</b>${num('hpMax', 'class="narrow" min="1" max="12" title="HP 上限"')}${boxes('hp')}</div>
-            <div class="track-row"><b>壓力</b>${num('stressMax', 'class="narrow" min="1" max="12" title="壓力上限"')}${boxes('stress')}</div>`
+            <div class="track-row"><b>HP</b>${totalNum('hp', 'class="narrow" min="1" max="12"')}${boxes('hp')}</div>
+            <div class="track-row"><b>壓力</b>${totalNum('stress', 'class="narrow" min="1" max="12"')}${boxes('stress')}</div>`
           )}
           ${section(
             '希望',
@@ -467,7 +548,7 @@ const Sheet = (() => {
             `<div class="portrait">${c.portrait ? `<img src="${esc(c.portrait)}" alt="頭像">` : '<span>頭像</span>'}</div>
              ${text('portrait', '圖片網址')}`
           )}
-          ${section('領域', `${text('domains.0', '領域 1', 'list="domainList"')}${text('domains.1', '領域 2', 'list="domainList"')}`)}
+          ${section('領域', `${text('domains.0', '領域 1', 'list="domainList"')}${text('domains.1', '領域 2', 'list="domainList"')}${domains2Field()}`)}
           ${section('金幣', text('gold'))}
         </div>
       </div>
@@ -572,6 +653,7 @@ const Sheet = (() => {
     if (el.dataset.type === 'number') {
       v = el.value === '' ? 0 : Number(el.value);
       if (!Number.isFinite(v)) v = 0;
+      if (el.dataset.total) v = statStoredFromTotal(ch(), el.dataset.total, v); // 畫面上是合計，存回去的是扣掉其他來源後的值
     } else if (el.dataset.type === 'bool') {
       v = el.checked;
     } else {
@@ -581,10 +663,13 @@ const Sheet = (() => {
     Store.save();
 
     if (path === 'name') refreshBar();
-    if (path.startsWith('domains.')) refreshLibResults();
+    if (path.startsWith('domains.') || path.startsWith('domains2.')) refreshLibResults();
     if (path === 'weapons.main.hands') applyHandsRule();
-    if (['hpMax', 'stressMax', 'armorSlots'].includes(path)) {
-      Object.keys(TRACKS).forEach((n) => TRACKS[n].max === path && renderTrack(n));
+    // 這些欄位會影響合計（熟練值：加拉帕；護甲欄：護甲值與閾值；力量：護甲值寫「3 + 力」時）
+    if (['proficiency', 'armor.baseScore', 'armor.baseThreshold', 'attrs.str.value'].includes(path)) refreshTotals();
+    if (el.dataset.total) {
+      el.title = statTitle(ch(), el.dataset.total); // 手動調整後，分項說明要立刻更新
+      Object.keys(TRACKS).forEach((n) => TRACKS[n].stat === el.dataset.total && renderTrack(n)); // 上限改了，勾選格數量跟著變
     }
     if (el.dataset.prep !== undefined) {
       updatePrepCount();
@@ -609,6 +694,17 @@ const Sheet = (() => {
         if (prefix === 'weapons.main') applyHandsRule();
       }
     }
+    // 混合血統：選擇特性取自哪個種族
+    if (el.dataset && el.dataset.mix !== undefined) {
+      const c = ch();
+      c.ancestryMix[Number(el.dataset.mix)] = el.value;
+      const done = applyMix(c);
+      Store.save();
+      renderAll();
+      if (done) toast('已加入混合血統的兩個種族特性');
+      return;
+    }
+
     // 選了職業 / 子職，自動帶入對應資料
     if (el.dataset && el.dataset.pick) {
       onPick(el.dataset.pick, el.value);
@@ -626,6 +722,7 @@ const Sheet = (() => {
           if (inp) inp.value = fill[path];
         });
         Store.save();
+        refreshTotals(); // 護甲值與傷害閾值讀自護甲，跟著更新
       }
     }
     if (el.dataset && el.dataset.bind === 'portrait') render();

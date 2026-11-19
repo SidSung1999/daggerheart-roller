@@ -43,6 +43,13 @@ const TEMPLATES = {
   traits: () => ({ source: '', name: '', desc: '', auto: '' }),
 };
 
+// 新角色的初始物品
+const STARTER_ITEMS = [
+  { name: '冒險者套組', qty: 1, desc: '火把、50英尺長的繩索、基本補給品（帳篷、睡袋、火絨盒、口糧等）' },
+  { name: '小型治療藥劑', qty: 1, desc: '恢復 1d4 生命點' },
+  { name: '小型精力藥', qty: 1, desc: '減少 1d4 壓力' },
+];
+
 function blankCharacter() {
   const attrs = {};
   ATTRS.forEach((a) => {
@@ -61,12 +68,12 @@ function blankCharacter() {
     level: 1,
     portrait: '',
     evasion: 0,
-    armorSlots: 0,
+    armorAdj: 0, // 護甲值、傷害閾值的基礎值讀自裝備的護甲，這三個存手動調整的差額（見 stat-bonus.js）
     armorMarked: 0,
     attrs,
     proficiency: 1,
-    majorThreshold: 1,
-    severeThreshold: 1,
+    majorAdj: 0,
+    severeAdj: 0,
     hpMax: 6,
     hpMarked: 0,
     stressMax: 6,
@@ -78,12 +85,15 @@ function blankCharacter() {
     inventoryWeapons: [emptyWeapon(), emptyWeapon()],
     armor: { name: '', baseThreshold: '', features: '', baseScore: '' },
     domains: ['', ''],
+    domains2: ['', ''], // 兼職（職業 Ⅱ）的兩個領域，選了職業 Ⅱ 會自動帶入
+    ancestryMix: ['', ''], // 混合血統：特性 1、特性 2 各取自哪個種族
+    ancestryMixName: '', // 混合血統的自創種族名稱
     domainCards: [],
     gold: '',
     backstory: '',
     resources: '',
     transformation: '',
-    items: [],
+    items: STARTER_ITEMS.map((it) => ({ ...it })), // 每個新角色都從初始物品開始
     traits: [],
   };
 }
@@ -97,11 +107,6 @@ function sampleCharacter() {
   c.domains = ['午夜 Midnight', '寓言 Grace'];
   c.gold = '10G';
   c.hopeFeature = '【閃身伎倆】花費 3 希望點，直到下次攻擊成功命中你之前，你的閃避值獲得 +2 加值。否則，此加值持續到你下次休息。';
-  c.items = [
-    { name: '冒險者套組', qty: 1, desc: '火把、50英尺長的繩索、基本補給品（帳篷、睡袋、火絨盒、口糧等）' },
-    { name: '小型治療藥劑', qty: 1, desc: '恢復 1d4 生命點' },
-    { name: '小型精力藥', qty: 1, desc: '減少 1d4 壓力' },
-  ];
   c.domainCards = [
     {
       domain: '午夜 Midnight',
@@ -167,13 +172,35 @@ function fillDefaults(target, defaults) {
   return target;
 }
 
+// 舊版直接存護甲值與傷害閾值的合計；新版改成讀裝備的護甲，另外存手動調整的差額。
+// 沒有裝備護甲資料的舊角色，把原本的數字轉成差額，畫面上的合計維持不變。
+function migrateArmorStats(c) {
+  if (c.armorAdj !== undefined) return;
+  const armor = c.armor || {};
+  const hasScore = String(armor.baseScore || '').trim() !== '';
+  const hasThreshold = String(armor.baseThreshold || '').trim() !== '';
+  const level = Number(c.level) || 1;
+  c.armorAdj = hasScore ? 0 : Number(c.armorSlots) || 0;
+  c.majorAdj = hasThreshold ? 0 : Math.max(0, (Number(c.majorThreshold) || 0) - level);
+  c.severeAdj = hasThreshold ? 0 : Math.max(0, (Number(c.severeThreshold) || 0) - level);
+  delete c.armorSlots;
+  delete c.majorThreshold;
+  delete c.severeThreshold;
+}
+
 function normalizeCharacter(c) {
+  migrateArmorStats(c);
   fillDefaults(c, blankCharacter());
   ['experiences', 'inventoryWeapons', 'domainCards', 'items', 'traits'].forEach((k) => {
     if (!Array.isArray(c[k])) c[k] = [];
     c[k] = c[k].map((it) => fillDefaults(it && typeof it === 'object' ? it : {}, TEMPLATES[k]()));
   });
   if (!Array.isArray(c.domains)) c.domains = ['', ''];
+  if (!Array.isArray(c.domains2)) c.domains2 = ['', ''];
+  if (!Array.isArray(c.ancestryMix) || c.ancestryMix.length !== 2) c.ancestryMix = ['', ''];
+  // 舊資料：已有職業 Ⅱ 但還沒有兼職領域時，依職業補上
+  const cls2 = typeof findClass === 'function' ? findClass(c.class2) : undefined;
+  if (cls2 && !c.domains2.some((d) => d && d.trim())) c.domains2 = [...cls2.domains];
   if (!c.id) c.id = uid();
   enforceTwoHanded(c); // 舊資料或匯入資料也套用「雙手武器不能配副手」
   return c;
