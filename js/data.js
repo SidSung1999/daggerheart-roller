@@ -106,6 +106,9 @@ function blankCharacter() {
     backstory: '',
     resources: '',
     transformation: '',
+    companion: blankCompanion(), // 遊俠（馴獸師）的動物夥伴（見 companion-rules.js）
+    beastForm: '', // 德魯伊目前變身的野獸型態名稱，空字串表示沒有變身（見 beast-rules.js）
+    beastPick: blankBeastPick(), // 進化 / 混種型態的選擇
     items: STARTER_ITEMS.map((it) => ({ ...it })), // 每個新角色都從初始物品開始
     traits: [],
   };
@@ -219,6 +222,11 @@ function normalizeCharacter(c) {
   c.traits.forEach(applyTraitFx); // 舊角色已經自動加入的特性，補上預設擲骰設定
   if (!Array.isArray(c.domains)) c.domains = ['', ''];
   if (!Array.isArray(c.domains2)) c.domains2 = ['', ''];
+  ['forms', 'advantages', 'abilities'].forEach((k) => {
+    if (!Array.isArray(c.beastPick[k])) c.beastPick[k] = [];
+  });
+  if (!Array.isArray(c.companion.experiences)) c.companion.experiences = [];
+  c.companion.experiences = c.companion.experiences.map((it) => fillDefaults(it && typeof it === 'object' ? it : {}, TEMPLATES.experiences()));
   if (!Array.isArray(c.ancestryMix) || c.ancestryMix.length !== 2) c.ancestryMix = ['', ''];
   // 舊資料：已有職業 Ⅱ 但還沒有兼職領域時，依職業補上
   const cls2 = typeof findClass === 'function' ? findClass(c.class2) : undefined;

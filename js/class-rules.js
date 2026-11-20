@@ -51,6 +51,7 @@ const AUTO_ORDER = [
   'ancestry', 'background', 'transformation',
   'class', 'foundation', 'specialization', 'mastery',
   'class2', 'multiclass', 'multiclass-specialization', 'multiclass-mastery',
+  'beastform', // 德魯伊野獸型態的能力，變身時加入、解除時移除（見 beast-rules.js）
 ];
 const SUB1_KINDS = ['foundation', 'specialization', 'mastery'];
 const SUB2_KINDS = { foundation: 'multiclass', specialization: 'multiclass-specialization', mastery: 'multiclass-mastery' };

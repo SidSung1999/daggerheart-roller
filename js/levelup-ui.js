@@ -2,11 +2,12 @@
 const LevelUp = (() => {
   const box = () => document.getElementById('levelup');
   const ch = () => Store.active();
-  const st = { logOpen: false, counts: {}, attrs: [], exps: [], result: null };
+  const st = { logOpen: false, counts: {}, attrs: [], exps: [], train: '', trainExp: -1, trainVicious: 'die', result: null };
+  const blankPick = () => ({ counts: {}, attrs: [], exps: [], train: '', trainExp: -1, trainVicious: 'die', result: null });
 
   // 已用掉幾個名額：熟練值、兼職一次算 2 個
   const total = () => Object.keys(st.counts).reduce((sum, k) => sum + st.counts[k] * pickWeight(k), 0);
-  const selection = () => ({ counts: { ...st.counts }, attrs: [...st.attrs], exps: [...st.exps] });
+  const selection = () => ({ counts: { ...st.counts }, attrs: [...st.attrs], exps: [...st.exps], train: st.train, trainExp: st.trainExp, trainVicious: st.trainVicious });
   const TIER_RANGE = { 2: '等級 2–4', 3: '等級 5–7', 4: '等級 8–10' };
 
   /* ---------- 角色卡上的升級紀錄 ---------- */
@@ -55,7 +56,7 @@ const LevelUp = (() => {
 
   function open() {
     if ((Number(ch().level) || 1) >= LEVEL_MAX) return toast(`已經是最高等級（${LEVEL_MAX} 級）`);
-    Object.assign(st, { counts: {}, attrs: [], exps: [], result: null });
+    Object.assign(st, blankPick());
     box().hidden = false;
     draw();
   }
@@ -134,6 +135,7 @@ const LevelUp = (() => {
       }).join('')}</div></div>`;
     }
 
+    const train = trainingStep(c);
     const err = validateLevelUp(c, selection());
     box().innerHTML = `<div class="lu-modal" role="dialog" aria-modal="true" aria-label="升級">
       <h2>升級　Lv ${to - 1} → Lv ${to}　<small>階級 ${tier}</small></h2>
@@ -141,13 +143,43 @@ const LevelUp = (() => {
       <p class="lu-title"><b>步驟 1</b>　從清單選 2 個名額（已選 ${sum} / 2；熟練值、兼職一次算 2 個）</p>
       <div class="lu-opts">${rows}</div>
       ${pickers}
-      <p class="lu-title"><b>步驟 2</b>　傷害閾值 +1（等級提高自動計算）；升級後再選一張不高於 ${to} 級的領域卡</p>
+      ${train}
+      <p class="lu-title"><b>步驟 ${train ? 3 : 2}</b>　傷害閾值 +1（等級提高自動計算）；升級後再選一張不高於 ${to} 級的領域卡</p>
       <p class="lu-err">${err ? esc(err) : '&nbsp;'}</p>
       <div class="lu-actions">
         <button type="button" data-lu="cancel">取消</button>
         <button type="button" class="primary" data-lu="ok" ${err ? 'disabled' : ''}>確定升級</button>
       </div>
     </div>`;
+  }
+
+  // 有夥伴時多一個步驟：選一項夥伴訓練（規則在 companion-rules.js）
+  function trainingStep(c) {
+    if (!hasCompanion(c)) return '';
+    const cp = c.companion;
+    if (!anyTrainingLeft(c)) return '<p class="lu-title"><b>步驟 2</b>　夥伴訓練已全部選滿</p>';
+    const rows = COMPANION_TRAINING.map((t) => {
+      const left = trainingLeft(c, t.key);
+      const on = st.train === t.key;
+      let extra = '';
+      if (on && t.key === 'clever') {
+        const named = cp.experiences.map((e, i) => ({ e, i })).filter(({ e }) => String(e.name || '').trim());
+        extra = named.length
+          ? `<select data-lu="trainExp"><option value="-1">選擇夥伴經歷</option>${named.map(({ e, i }) => `<option value="${i}" ${st.trainExp === i ? 'selected' : ''}>${esc(e.name)} +${Number(e.bonus) || 0} → +${(Number(e.bonus) || 0) + 1}</option>`).join('')}</select>`
+          : '<em class="warn">夥伴還沒有填寫名稱的經歷</em>';
+      }
+      if (on && t.key === 'vicious') {
+        const die = stepUp(COMPANION_DICE, cp.die);
+        const rng = stepUp(COMPANION_RANGES, cp.range);
+        const radio = (v, label, ok) => `<label class="lu-chk ${ok ? '' : 'off'}"><input type="radio" name="luVicious" data-lu="vicious" value="${v}" ${st.trainVicious === v ? 'checked' : ''} ${ok ? '' : 'disabled'}> ${esc(label)}</label>`;
+        extra = radio('die', die ? `傷害骰 ${cp.die} → ${die}` : '傷害骰已是 d12', !!die) + radio('range', rng ? `距離 ${cp.range} → ${rng}` : '距離不能再提升', !!rng);
+      }
+      return `<label class="lu-opt ${on ? 'on' : ''} ${left ? '' : 'off'}">
+        <span class="lu-label"><input type="radio" name="luTrain" data-lu="train" value="${t.key}" ${on ? 'checked' : ''} ${left ? '' : 'disabled'}>
+          ${esc(t.name)} <small class="muted">${left ? `剩 ${left} 次` : '（已選滿）'}　${esc(t.desc)}</small></span>
+      </label>${extra ? `<div class="lu-pick lu-chks">${extra}</div>` : ''}`;
+    }).join('');
+    return `<p class="lu-title"><b>步驟 2</b>　夥伴訓練：替${esc(cp.name || '夥伴')}選一項</p><div class="lu-opts">${rows}</div>`;
   }
 
   function drawResult() {
@@ -195,6 +227,9 @@ const LevelUp = (() => {
   function onChange(e) {
     const el = e.target;
     if (!el.dataset || !el.dataset.lu) return;
+    if (el.dataset.lu === 'train') { st.train = el.value; return draw(); }
+    if (el.dataset.lu === 'trainExp') { st.trainExp = Number(el.value); return draw(); }
+    if (el.dataset.lu === 'vicious') { st.trainVicious = el.value; return draw(); }
     const list = el.dataset.lu === 'attr' ? st.attrs : el.dataset.lu === 'exp' ? st.exps : null;
     if (!list) return;
     const v = el.dataset.lu === 'exp' ? Number(el.dataset.key) : el.dataset.key;

@@ -3,13 +3,15 @@ const Sheet = (() => {
   const root = () => document.getElementById('sheet');
   const ch = () => Store.active();
 
-  // 勾選格軌道：已標記數量欄位、上限來源（stat 見 stat-bonus.js；fixed 為固定格數）、上限範圍
+  // 勾選格軌道：已標記數量的資料路徑、上限來源（stat 見 stat-bonus.js；max 為依角色算出的格數）、上限範圍
   const TRACKS = {
     hp: { marked: 'hpMarked', stat: 'hp', min: 1, cap: 12, label: 'HP' },
     stress: { marked: 'stressMarked', stat: 'stress', min: 1, cap: 12, label: '壓力' },
-    hope: { marked: 'hopeMarked', fixed: 6, label: '希望' },
+    hope: { marked: 'hopeMarked', max: hopeMax, label: '希望' }, // 6 格；夥伴訓練「黑暗中的光芒」多 1 格
     armor: { marked: 'armorMarked', stat: 'armor', min: 0, cap: 12, label: '護甲' },
+    cstress: { marked: 'companion.stressMarked', max: companionStressMax, label: '夥伴壓力' },
   };
+  const PORTRAIT_PATHS = ['portrait', 'companion.portrait'];
 
   const WEAPON_FIELDS = ['name', 'trait', 'features', 'range', 'damage', 'type', 'hands'];
 
@@ -49,7 +51,7 @@ const Sheet = (() => {
   /* ---------- 勾選格 ---------- */
   function trackMax(name) {
     const t = TRACKS[name];
-    if (t.fixed) return t.fixed;
+    if (t.max) return t.max(ch());
     const n = Math.floor(statTotal(ch(), t.stat)); // 基礎值加上種族加成
     return Math.max(t.min, Math.min(t.cap, n));
   }
@@ -57,7 +59,7 @@ const Sheet = (() => {
   function boxesInner(name) {
     const t = TRACKS[name];
     const max = trackMax(name);
-    const marked = Math.min(Number(ch()[t.marked]) || 0, max);
+    const marked = Math.min(Number(getPath(ch(), t.marked)) || 0, max);
     let h = '';
     for (let i = 0; i < max; i++) {
       h += `<button type="button" class="box ${i < marked ? 'on' : ''}" data-track="${name}" data-i="${i}" aria-label="${t.label} ${i + 1}"></button>`;
@@ -293,6 +295,132 @@ const Sheet = (() => {
     const c = ch();
     if (!String(c.class2 || '').trim()) return '';
     return `<div class="multi-domain"><small>兼職領域（${esc(c.class2)}）</small>${text('domains2.0', '領域 1', 'list="domainList"')}${text('domains2.1', '領域 2', 'list="domainList"')}</div>`;
+  }
+
+  // 德魯伊的野獸型態：選了型態就是變身，選「未變身」就是解除。不是德魯伊、也沒有變身時不顯示。
+  function beastSection() {
+    const c = ch();
+    if (!isDruid(c) && !c.beastForm) return '';
+    const form = findBeastForm(c.beastForm);
+    const list = beastFormsFor(c);
+    if (form && !list.includes(form)) list.push(form); // 等級改低了，目前的型態仍要顯示
+    const groups = [1, 2, 3, 4]
+      .map((t) => {
+        const fs = list.filter((f) => f.tier === t);
+        if (!fs.length) return '';
+        return `<optgroup label="階級 ${t}">${fs
+          .map((f) => opt(f.name, `${f.name}（${f.examples}）`, form === f))
+          .join('')}</optgroup>`;
+      })
+      .join('');
+    return section(
+      '🐾 野獸型態',
+      `<select data-beast aria-label="野獸型態">${opt('', '（未變身）', !form)}${groups}</select>
+       <p class="muted">變身時請自己標記 1 點壓力（或用希望特性「幻化成獸」）。野獸型態下不能使用武器，也不能施放領域卡的法術。
+       閃避值、傷害閾值會自動加上型態的加值；屬性加值與攻擊在擲骰器裡使用；能力會加到角色特性。</p>
+       ${form && form.special ? beastPickHtml(c, form) : ''}
+       ${beastDetailHtml(c)}`,
+      'beast'
+    );
+  }
+
+  // 進化：選一個原型態；混種：勾選原型態、優勢行動、能力
+  function beastPickHtml(c, form) {
+    const p = c.beastPick;
+    const chk = (kind, value, label, on, full, title = '') =>
+      `<label class="lu-chk ${on ? 'on' : ''} ${!on && full ? 'off' : ''}" ${title ? `title="${esc(title)}"` : ''}><input type="checkbox" data-beastpick="${kind}" value="${esc(value)}" ${on ? 'checked' : ''} ${!on && full ? 'disabled' : ''}> ${esc(label)}</label>`;
+    if (form.special === 'evolve') {
+      const choices = beastBaseChoices(form);
+      return `<div class="beast-pick"><b>進化的原型態</b>
+        <select data-beastpick="base" aria-label="進化的原型態">${opt('', '選擇原型態', !p.base)}${choices
+          .map((f) => opt(f.name, `階級 ${f.tier}・${f.name}（${f.attack.damage}）`, p.base === f.name))
+          .join('')}</select></div>`;
+    }
+    const rule = BEAST_HYBRID[form.tier];
+    const pool = hybridPool(c);
+    const forms = beastBaseChoices(form)
+      .map((f) => chk('forms', f.name, `階級 ${f.tier}・${f.name}`, p.forms.includes(f.name), p.forms.length >= rule.forms))
+      .join('');
+    const advs = pool.advantages
+      .map((a) => chk('advantages', a, a, p.advantages.includes(a), p.advantages.length >= rule.advantages))
+      .join('');
+    const abis = pool.abilities
+      .map((a) => chk('abilities', a.key, `${a.name}（${a.from}）`, p.abilities.includes(a.key), p.abilities.length >= rule.abilities, a.desc))
+      .join('');
+    return `<div class="beast-pick">
+      <b>原型態（選 ${rule.forms}，已選 ${p.forms.length}）</b><div class="lu-chks">${forms}</div>
+      ${pool.forms.length ? `<b>優勢行動（選 ${rule.advantages}，已選 ${p.advantages.length}）</b><div class="lu-chks">${advs}</div>
+      <b>能力（選 ${rule.abilities}，已選 ${p.abilities.length}）</b><div class="lu-chks">${abis}</div>` : ''}
+    </div>`;
+  }
+
+  function beastDetailHtml(c) {
+    const b = resolveBeast(c);
+    if (!b) return '';
+    if (b.incomplete) return `<p class="warn">⚠ ${esc(b.incomplete)}，選完之前不會套用型態的加值與能力</p>`;
+    const t = beastThresholdBonus(b);
+    return `<dl class="beast-info">
+      ${b.note ? `<dt>規則</dt><dd>${esc(b.note)}</dd>` : ''}
+      <dt>加值</dt><dd>${esc(b.attr)} +${b.attrBonus}　閃避值 +${b.evasion}${t ? `　傷害閾值 ${t > 0 ? '+' : ''}${t}` : ''}</dd>
+      <dt>攻擊</dt><dd>${esc(`${b.attack.range} ${b.attack.attr} ${b.attack.damage} ${b.attack.type}`)}<small class="muted">（骰數 = 熟練值）</small></dd>
+      <dt>優勢行動</dt><dd>${esc(b.advantages.join('、'))}</dd>
+      <dt>能力</dt><dd>${b.abilities.map((a) => `<b>【${esc(a.name)}】</b>${esc(a.desc)}`).join('<br>')}</dd>
+    </dl>`;
+  }
+
+  // 遊俠（馴獸師）的動物夥伴。子職不是馴獸師時不顯示（資料保留）。
+  function companionSection() {
+    const c = ch();
+    if (!hasCompanion(c)) return '';
+    const cp = c.companion;
+    const exps = cp.experiences
+      .map(
+        (e, i) => `<div class="list-row">
+          ${text(`companion.experiences.${i}.name`, '經歷名稱')}
+          ${num(`companion.experiences.${i}.bonus`, 'class="narrow"')}
+          <button type="button" class="x" data-del="companion.experiences.${i}" aria-label="刪除夥伴經歷">✕</button>
+        </div>`
+      )
+      .join('');
+    const sel = (path, list) =>
+      `<select data-bind="${path}">${list.map((v) => opt(v, v, val(path) === v)).join('')}${list.includes(val(path)) ? '' : opt(val(path), val(path), true)}</select>`;
+    const training = COMPANION_TRAINING.map((t) => {
+      const used = trainingUsed(c, t.key);
+      let b = '';
+      for (let i = 0; i < t.cap; i++) {
+        b += `<button type="button" class="ubox ${i < used ? 'on' : ''}" data-ctrain="${t.key}" data-i="${i}" aria-label="${esc(t.name)} 第 ${i + 1} 格"></button>`;
+      }
+      return `<div class="up-row"><span class="up-boxes">${b}</span><span class="up-label"><b>${esc(t.name)}</b>　${esc(t.desc)}</span></div>`;
+    }).join('');
+    return section(
+      `🐺 遊俠夥伴 <span class="prof">閃避值 <input type="number" class="narrow" data-cevasion value="${companionEvasion(c)}" title="${esc(companionEvasionTitle(c))}" aria-label="夥伴閃避值"></span>`,
+      `<div class="comp-grid">
+        <div>
+          ${field('夥伴名稱', text('companion.name'))}
+          ${field('夥伴描述', area('companion.desc', 3))}
+          <div class="list-head"><span>夥伴經歷</span><span>加值</span></div>${exps}
+          <button type="button" class="add" data-add="companion.experiences">＋ 新增夥伴經歷</button>
+        </div>
+        <div>
+          <label class="portrait" title="點擊選擇圖片，或把圖片拖放到這裡">
+            ${cp.portrait ? `<img src="${esc(cp.portrait)}" alt="夥伴頭像">` : '<span>夥伴頭像<br>點擊上傳或拖放</span>'}
+            <input type="file" accept="image/*" data-portrait-file="companion.portrait" hidden>
+          </label>
+          ${cp.portrait ? '<button type="button" class="add" data-portrait-clear="companion.portrait">移除頭像</button>' : ''}
+        </div>
+      </div>
+      <div class="comp-attack">
+        ${field('攻擊方式', text('companion.attack', '例如：撕咬'))}
+        ${field('距離', sel('companion.range', COMPANION_RANGES))}
+        ${field('傷害骰', sel('companion.die', COMPANION_DICE))}
+      </div>
+      <div class="track-row"><b>壓力</b>${boxes('cstress')}</div>
+      <p class="muted">命令夥伴：以施法檢定代替動作檢定，可花 1 點希望加入一個適用的夥伴經歷；希望成功時，下一個建立在其成功之上的動作獲得優勢。
+        夥伴攻擊成功時，傷害用你的熟練值 × 夥伴的傷害骰。夥伴受到任何傷害就標記 1 點壓力，壓力滿時脫離場景，下次長休返回並清除 1 點壓力。</p>
+      <h3 class="comp-h">夥伴訓練 <small class="muted">每次升級時選一項（升級精靈會一起處理）；也可以點格子補登</small></h3>
+      ${training}`,
+      'companion'
+    );
   }
 
   // 子職的專精、大師特性要到升級時才取得，所以交給玩家按鈕加入
@@ -580,6 +708,9 @@ const Sheet = (() => {
         </div>
       </div>
 
+      ${beastSection()}
+      ${companionSection()}
+
       ${section(
         `領域卡 <span class="prof">已準備 <b id="prepCount">${preparedCount()}</b>/${MAX_PREPARED}　持有 ${c.domainCards.length} 張</span>`,
         `${libHtml()}
@@ -669,6 +800,17 @@ const Sheet = (() => {
       return;
     }
 
+    // 夥伴閃避值：畫面上是合計，存回去的是手動調整的差額
+    if (el.dataset && el.dataset.cevasion !== undefined) {
+      const c = ch();
+      const v = Number(el.value);
+      if (el.value === '' || !Number.isFinite(v)) return;
+      c.companion.evasionAdj = v - (companionEvasion(c) - (Number(c.companion.evasionAdj) || 0));
+      Store.save();
+      el.title = companionEvasionTitle(c);
+      return;
+    }
+
     const path = el.dataset && el.dataset.bind;
     if (!path) return;
 
@@ -708,13 +850,13 @@ const Sheet = (() => {
   }
 
   // 頭像：縮小壓縮後直接存進角色資料，不需要圖片網址
-  async function setPortrait(file) {
-    if (!file) return;
+  async function setPortrait(file, path = 'portrait') {
+    if (!file || !PORTRAIT_PATHS.includes(path)) return;
     const id = ch().id;
     try {
       const url = await ImageUtil.fileToDataUrl(file);
       if (ch().id !== id) return; // 處理期間切換了角色
-      ch().portrait = url;
+      setPath(ch(), path, url);
       Store.save();
       render();
     } catch (e) {
@@ -728,7 +870,7 @@ const Sheet = (() => {
     if (el.dataset && el.dataset.portraitFile !== undefined) {
       const file = el.files && el.files[0];
       el.value = ''; // 之後選同一個檔案也會觸發
-      return setPortrait(file);
+      return setPortrait(file, el.dataset.portraitFile || 'portrait');
     }
 
     // 輸入的武器名稱符合武器清單時，自動帶入其他欄位
@@ -753,6 +895,26 @@ const Sheet = (() => {
       Store.save();
       renderAll();
       if (done) toast('已加入混合血統的兩個種族特性');
+      return;
+    }
+
+    // 野獸型態：進化 / 混種的選擇
+    if (el.dataset && el.dataset.beastpick) {
+      const kind = el.dataset.beastpick;
+      const msg = setBeastPick(ch(), kind, el.value, kind === 'base' ? true : el.checked);
+      Store.save();
+      renderAll();
+      if (msg) toast(msg);
+      return;
+    }
+
+    // 野獸型態：變身或解除
+    if (el.dataset && el.dataset.beast !== undefined) {
+      const f = applyBeastForm(ch(), el.value);
+      Store.save();
+      renderAll(); // 閃避、閾值、角色特性、擲骰器都會變
+      const extra = f && f.special === 'hybrid' ? BEAST_HYBRID[f.tier].stress : 0;
+      toast(f ? `已變身為「${f.name}」，記得標記 ${1 + extra} 點壓力` : '已解除野獸型態');
       return;
     }
 
@@ -784,7 +946,8 @@ const Sheet = (() => {
     if (!btn) return;
 
     if (btn.dataset.portraitClear !== undefined) {
-      ch().portrait = '';
+      const p = btn.dataset.portraitClear || 'portrait';
+      if (PORTRAIT_PATHS.includes(p)) setPath(ch(), p, '');
       Store.save();
       render();
       return;
@@ -792,6 +955,13 @@ const Sheet = (() => {
 
     if (btn.dataset.levelup !== undefined) {
       LevelUp.open();
+      return;
+    }
+
+    if (btn.dataset.ctrain) {
+      toggleTrainingBox(ch(), btn.dataset.ctrain, Number(btn.dataset.i));
+      Store.save();
+      render(); // 閃避、壓力格、希望格可能改變
       return;
     }
 
@@ -826,27 +996,32 @@ const Sheet = (() => {
     if (btn.dataset.track) {
       const t = TRACKS[btn.dataset.track];
       const i = Number(btn.dataset.i);
-      const cur = Math.min(Number(ch()[t.marked]) || 0, trackMax(btn.dataset.track));
+      const cur = Math.min(Number(getPath(ch(), t.marked)) || 0, trackMax(btn.dataset.track));
       const next = i < cur ? i : i + 1;
-      ch()[t.marked] = next;
+      setPath(ch(), t.marked, next);
       Store.save();
       [...btn.parentElement.children].forEach((b, idx) => b.classList.toggle('on', idx < next));
       return;
     }
 
     if (btn.dataset.add) {
+      // 清單路徑可以是 experiences 或 companion.experiences，範本依最後一段名稱
       const list = btn.dataset.add;
-      if (!TEMPLATES[list]) return;
-      ch()[list].push(TEMPLATES[list]());
+      const tpl = TEMPLATES[list.split('.').pop()];
+      const arr = getPath(ch(), list);
+      if (!tpl || !Array.isArray(arr)) return;
+      arr.push(tpl());
       Store.save();
       render();
       return;
     }
 
     if (btn.dataset.del) {
-      const [list, idx] = btn.dataset.del.split('.');
-      if (!Array.isArray(ch()[list])) return;
-      ch()[list].splice(Number(idx), 1);
+      const keys = btn.dataset.del.split('.');
+      const idx = keys.pop();
+      const arr = getPath(ch(), keys.join('.'));
+      if (!Array.isArray(arr)) return;
+      arr.splice(Number(idx), 1);
       Store.save();
       render();
     }
@@ -874,7 +1049,8 @@ const Sheet = (() => {
       if (!box) return;
       e.preventDefault();
       box.classList.remove('drag');
-      setPortrait(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+      const input = box.querySelector('[data-portrait-file]');
+      setPortrait(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0], (input && input.dataset.portraitFile) || 'portrait');
     });
   }
 

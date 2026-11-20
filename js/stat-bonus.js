@@ -5,7 +5,8 @@
    - 護甲值、中度 / 重度傷害閾值：基礎值直接讀目前裝備的護甲（護甲區的「基礎護甲值」「基礎傷害閾值」），
      再疊加等級（閾值）、力量（護甲值寫「3 + 力」時）、種族加成。角色資料存的是「手動調整」的差額，
      所以換護甲時數字會自動跟著變。
-   依賴 origin-rules.js（findAncestry）與 class-rules.js（classKey）。 */
+   德魯伊變身期間，閃避值與傷害閾值另外疊加「野獸型態」（見 beast-rules.js 的 beastEntries）。
+   依賴 origin-rules.js（findAncestry）、class-rules.js（classKey）與 beast-rules.js。 */
 
 // 各項數值存在角色資料裡的欄位。護甲值與閾值存的是手動調整的差額（預設 0）。
 const STAT_FIELDS = {
@@ -75,7 +76,9 @@ function statParts(c, stat) {
   } else {
     parts.push({ value: stored, source: '職業' });
   }
-  ancestryEntries(c).filter((e) => e.stat === stat).forEach((e) => parts.push({ value: e.value, source: e.source }));
+  [...ancestryEntries(c), ...beastEntries(c)]
+    .filter((e) => e.stat === stat)
+    .forEach((e) => parts.push({ value: e.value, source: e.source }));
   if (ARMOR_STATS.includes(stat)) parts.push({ value: stored, source: '手動' });
   return parts;
 }

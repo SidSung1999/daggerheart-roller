@@ -125,7 +125,7 @@ function validateLevelUp(c, sel) {
     if (new Set(exps).size !== exps.length || exps.some((i) => !named.includes(i))) return '經歷選擇不正確';
   }
   if (counts.sub && !currentSubclass(c)) return '升級子職業需要先在表頭選好職業與子職業';
-  return '';
+  return companionTrainingError(c, sel); // 有夥伴時，每次升級也要選一項夥伴訓練（companion-rules.js）
 }
 
 // 套用升級。回傳 { ok, error, changes: [...], reminders: [...] }
@@ -193,6 +193,9 @@ function applyLevelUp(c, sel) {
   if (counts.card) {
     reminders.push(`領域卡選項：再多選一張不高於 ${to} 級的領域卡`);
   }
+
+  const trained = applyCompanionTraining(c, sel);
+  if (trained) changes.push(trained);
 
   changes.push('傷害閾值 +1（等級提高，自動計算）');
   reminders.push(`每次升級都要選一張不高於 ${to} 級的領域卡（可用領域卡區的卡片庫）`);

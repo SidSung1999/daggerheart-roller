@@ -13,7 +13,7 @@ const Roller = (() => {
   const signed = (n) => (n >= 0 ? '+' : '') + n;
   const flatTerm = (n) => ({ kind: 'flat', sign: n < 0 ? -1 : 1, value: Math.abs(n) });
 
-  const newCheckState = () => ({ attr: null, adv: 0, exp: {}, cards: {}, cond: {}, units: {}, extra: '' });
+  const newCheckState = () => ({ attr: null, adv: 0, beastAdv: false, cexp: {}, exp: {}, cards: {}, cond: {}, units: {}, extra: '' });
 
   function S() {
     const id = ch().id;
@@ -21,7 +21,7 @@ const Roller = (() => {
       states[id] = {
         action: newCheckState(),
         reaction: newCheckState(),
-        damage: { src: 'weapons.main', cards: {}, cond: {}, spellCond: {}, units: {}, extra: '' },
+        damage: { src: '', cards: {}, cond: {}, spellCond: {}, units: {}, extra: '' },
       };
     }
     return states[id];
@@ -137,11 +137,12 @@ const Roller = (() => {
 
     if (st.attr) {
       const a = ATTRS.find((x) => x.key === st.attr);
-      const v = Number(c.attrs[st.attr].value) || 0;
-      if (v !== 0) items.push({ label: `${a.label}`, terms: [flatTerm(v)] });
+      const v = attrValue(c, st.attr);
+      if (v !== 0) items.push({ label: beastAttrBonus(c, st.attr) ? `${a.label}（含野獸型態）` : a.label, terms: [flatTerm(v)] });
     }
     // 優勢：每個優勢擲一顆 d6，有好幾個優勢時全部一起擲、只取最高的加上去
-    const advN = Math.max(0, Math.min(9, Math.floor(Number(st.adv)) || 0));
+    const beastAdv = st.beastAdv && currentBeast(c) ? 1 : 0; // 野獸型態的優勢行動：多 1 個優勢
+    const advN = Math.max(0, Math.min(9, (Math.floor(Number(st.adv)) || 0) + beastAdv));
     if (advN) {
       const die = { kind: 'dice', sign: 1, count: advN, sides: 6 };
       if (advN > 1) die.keep = { mode: 'h', n: 1 };
@@ -153,16 +154,72 @@ const Roller = (() => {
         if (b !== 0) items.push({ label: `經歷：${e.name}`, terms: [flatTerm(b)] });
       }
     });
+    if (hasCompanion(c)) {
+      c.companion.experiences.forEach((e, i) => {
+        if (st.cexp[i] && String(e.name || '').trim()) {
+          const b = Number(e.bonus) || 0;
+          if (b !== 0) items.push({ label: `夥伴經歷：${e.name}`, terms: [flatTerm(b)] });
+        }
+      });
+    }
     items.push(...cardItems('check', st, errors), ...extraItem(st, errors));
     return { items, errors };
   }
 
+  // 屬性值：變身時加上野獸型態的屬性加值
+  const attrValue = (c, key) => (Number(c.attrs[key].value) || 0) + beastAttrBonus(c, key);
+
+  // 野獸型態的攻擊，當成一把武器（傷害骰數 = 熟練值）
+  function beastSource(c) {
+    const f = currentBeast(c);
+    if (!f) return null;
+    const a = f.attack;
+    return { path: 'beast', slot: '野獸型態', weapon: { ...emptyWeapon(), name: `${f.name}攻擊`, trait: a.attr, range: a.range, damage: a.damage, type: a.type } };
+  }
+
+  // 夥伴攻擊：你的熟練值 × 夥伴的傷害骰
+  function companionSource(c) {
+    if (!hasCompanion(c)) return null;
+    const cp = c.companion;
+    const name = `${cp.name || '夥伴'}${cp.attack ? '・' + cp.attack : '攻擊'}`;
+    return { path: 'companion', slot: '夥伴', weapon: { ...emptyWeapon(), name, range: cp.range, damage: cp.die } };
+  }
+
+  // 命令夥伴：施法屬性（子職 Ⅰ 或 Ⅱ 是馴獸師時用它的施法屬性）
+  function companionSpellAttr(c) {
+    const sub = [currentSubclass(c), currentSubclass2(c)].find((s) => s && classKey(s.name) === '馴獸師');
+    return sub ? ATTRS.find((a) => a.label === sub.spellAttr) : undefined;
+  }
+
+  function companionPanel(st) {
+    const c = ch();
+    if (!hasCompanion(c)) return '';
+    const cp = c.companion;
+    const a = companionSpellAttr(c);
+    const rows = cp.experiences
+      .map((e, i) =>
+        String(e.name || '').trim()
+          ? optionRow(`<span>${esc(e.name)}</span><code>${signed(Number(e.bonus) || 0)}</code>`, !!st.cexp[i], `data-act="cexp" data-i="${i}"`)
+          : ''
+      )
+      .join('');
+    return `<div class="panel"><h2>🐺 命令夥伴${cp.name ? '：' + esc(cp.name) : ''}</h2>
+      <p class="muted">以施法檢定代替動作檢定，可花 1 點希望加入一個適用的夥伴經歷。</p>
+      ${a ? `<button type="button" class="add" data-act="cmd" data-key="${a.key}">使用施法屬性：${esc(a.label)}</button>` : ''}
+      ${rows || '<p class="muted">夥伴還沒有填寫經歷</p>'}
+    </div>`;
+  }
+
   function damageSources() {
     const c = ch();
+    const beast = beastSource(c);
     const list = [{ path: 'weapons.main', slot: '主手' }];
     if (c.weapons.main.hands !== '雙手') list.push({ path: 'weapons.off', slot: '副手' }); // 雙手武器不能配副手
     c.inventoryWeapons.forEach((_, i) => list.push({ path: `inventoryWeapons.${i}`, slot: `庫存 ${i + 1}` }));
-    return list.map((s) => ({ ...s, weapon: getPath(c, s.path) }));
+    const weapons = list.map((s) => ({ ...s, weapon: getPath(c, s.path) }));
+    const comp = companionSource(c);
+    if (comp) weapons.splice(c.weapons.main.hands !== '雙手' ? 2 : 1, 0, comp); // 放在主手 / 副手之後
+    return beast ? [beast, ...weapons] : weapons;
   }
 
   function collectDamage() {
@@ -229,10 +286,20 @@ const Roller = (() => {
   function checkPanel(mode) {
     const c = ch();
     const st = S()[mode];
-    const attrs = ATTRS.map(
-      (a) => `<button type="button" class="attr-btn ${st.attr === a.key ? 'sel' : ''}" data-act="attr" data-key="${a.key}">
-        <span>${a.label}</span><b>${signed(Number(c.attrs[a.key].value) || 0)}</b></button>`
-    ).join('');
+    const attrs = ATTRS.map((a) => {
+      const bonus = beastAttrBonus(c, a.key);
+      const title = bonus ? `title="${Number(c.attrs[a.key].value) || 0}(角色)+${bonus}(野獸型態)"` : '';
+      return `<button type="button" class="attr-btn ${st.attr === a.key ? 'sel' : ''} ${bonus ? 'beast' : ''}" data-act="attr" data-key="${a.key}" ${title}>
+        <span>${a.label}${bonus ? ' 🐾' : ''}</span><b>${signed(attrValue(c, a.key))}</b></button>`;
+    }).join('');
+    const beast = currentBeast(c);
+    const beastRow = beast
+      ? optionRow(
+          `<span>🐾 優勢行動<small class="muted">　${esc(beast.advantages.join('、'))}</small></span><code>+1 優勢</code>`,
+          !!st.beastAdv,
+          'data-act="beastAdv"'
+        )
+      : '';
     const exps = c.experiences
       .map((e, i) =>
         e.name.trim()
@@ -249,8 +316,10 @@ const Roller = (() => {
           <code>+d6</code>
           <span class="unit"><input type="number" min="0" max="9" value="${Number(st.adv) || 0}" data-act="advn" aria-label="優勢數量"></span>
         </div>
+        ${beastRow}
         ${exps || '<p class="muted">角色卡尚未填寫經歷</p>'}
       </div>
+      ${mode === 'action' ? companionPanel(st) : ''}
       <div class="panel"><h2>領域卡與角色特性</h2>${cardRows('check', st)}</div>
       <div class="panel"><h2>額外加值</h2>
         <input type="text" class="extra" data-act="extra" value="${esc(st.extra)}" placeholder="例：+1d6 或 -2（其他來源的加值）">
@@ -285,10 +354,14 @@ const Roller = (() => {
           })
           .join('')
       : '<p class="muted">沒有已準備的「獨立傷害」領域卡</p>';
+    const beast = currentBeast(c);
+    const src = damageSources().find((s) => s.path === st.src) || damageSources()[0];
+    const weaponWarn = beast && src.path !== 'beast' ? '<p class="warn">⚠ 野獸型態下不能使用武器</p>' : '';
+    const spellWarn = beast && spells.length ? '<p class="warn">⚠ 野獸型態下不能施放領域卡的法術</p>' : '';
 
     return `
-      <div class="panel"><h2>武器（熟練值 ${prof}）</h2>
-        <select class="extra" data-act="src">${srcOpts}</select>
+      <div class="panel"><h2>${beast ? '攻擊' : '武器'}（熟練值 ${prof}）</h2>
+        <select class="extra" data-act="src">${srcOpts}</select>${weaponWarn}
       </div>
       <div class="panel"><h2>領域卡與角色特性（加到傷害）</h2>${cardRows('damage', st)}</div>
       <div class="panel"><h2>額外加值</h2>
@@ -296,8 +369,14 @@ const Roller = (() => {
       </div>
       <div class="panel"><h2>公式預覽</h2><div class="formula" id="preview">${previewText('damage')}</div></div>
       <button type="button" class="roll-btn" data-act="roll">🎲 擲骰！</button>
-      <div class="panel spells"><h2>獨立傷害（法術）</h2>${spellHtml}</div>
+      <div class="panel spells"><h2>獨立傷害（法術）</h2>${spellWarn}${spellHtml}</div>
       <div id="result"></div>`;
+  }
+
+  // 變身時在角色名稱旁提示目前的型態與攻擊
+  function beastNote() {
+    const f = currentBeast(ch());
+    return f ? `　<span class="beast-note">🐾 ${esc(f.name)}（攻擊：${esc(`${f.attack.range} ${f.attack.attr} ${f.attack.damage}`)}）</span>` : '';
   }
 
   function render() {
@@ -306,7 +385,7 @@ const Roller = (() => {
       (s) => `<button type="button" class="sub-btn ${s.k === sub ? 'active' : ''}" data-sub="${s.k}">${s.l}</button>`
     ).join('');
     root().innerHTML = `
-      <p class="who">目前角色：<b>${esc(ch().name)}</b>　熟練值 ${Number(ch().proficiency) || 1}</p>
+      <p class="who">目前角色：<b>${esc(ch().name)}</b>　熟練值 ${Number(ch().proficiency) || 1}${beastNote()}</p>
       <div class="subtabs">${tabs}</div>
       ${sub === 'damage' ? damagePanel() : checkPanel(sub)}`;
   }
@@ -426,6 +505,11 @@ const Roller = (() => {
     if (!btn) return;
     const act = btn.dataset.act;
 
+    if (act === 'cmd') {
+      S()[sub].attr = btn.dataset.key;
+      render();
+      return;
+    }
     if (act === 'attr') {
       const st = S()[sub];
       st.attr = st.attr === btn.dataset.key ? null : btn.dataset.key;
@@ -452,6 +536,8 @@ const Roller = (() => {
       if (row) row.classList.toggle('on', st.adv > 0);
     }
     else if (act === 'exp') st.exp[i] = el.checked;
+    else if (act === 'beastAdv') st.beastAdv = el.checked;
+    else if (act === 'cexp') st.cexp[i] = el.checked;
     else if (act === 'card') st.cards[i] = el.checked;
     else if (act === 'cond') st.cond[i] = el.checked;
     else if (act === 'spellCond') st.spellCond[i] = el.checked;
