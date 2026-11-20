@@ -71,10 +71,13 @@ const RoomFirebase = (() => {
         const me = m.db.push(presenceRef);
 
         // 連線建立（含斷線重連）時，重新登記在線並設定斷線自動移除
+        // 順序要先寫入再登記斷線移除：資料庫規則在登記當下就會檢查「能不能刪這筆」，
+        // 這筆還不存在時無法判斷是誰的，登記會被拒絕，斷線後就留下一筆刪不掉的在線紀錄。
         const offConnected = m.db.onValue(m.db.ref(db, '.info/connected'), (snap) => {
           if (!snap.val()) return;
-          m.db.onDisconnect(me).remove();
-          m.db.set(me, { uid, name }).catch(() => {});
+          Promise.resolve(m.db.set(me, { uid, name }))
+            .then(() => m.db.onDisconnect(me).remove())
+            .catch((err) => onError && onError(err));
         });
         const offPresence = m.db.onValue(
           presenceRef,
