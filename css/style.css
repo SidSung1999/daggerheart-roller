@@ -427,3 +427,36 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
 .beast-pick { display: grid; gap: 6px; margin-bottom: 10px; padding: 8px; border: 1px dashed var(--line2); border-radius: 6px; }
 .beast-pick b { color: var(--gold); font-size: 0.85rem; }
 .beast-pick select { width: 100%; }
+
+/* ---------- 隊伍（共享角色卡） ---------- */
+.party-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.party-bar small { flex: 1 1 260px; }
+.party-empty { margin: 20px 4px; }
+.party-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.pcard { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; font-size: 0.9rem; }
+.pcard.mine { border-color: var(--gold); }
+.pc-meta { color: var(--muted); font-size: 0.8rem; }
+.pc-head { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; }
+.pc-head h3 { color: var(--gold); font-size: 1.1rem; }
+.pc-head p { color: var(--muted); font-size: 0.8rem; }
+.pc-portrait { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line2); }
+.pc-portrait.none { display: flex; align-items: center; justify-content: center; color: var(--muted); background: var(--field); }
+.pc-stats, .pc-attrs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+.pc-attrs { grid-template-columns: repeat(6, 1fr); }
+.pc-stats div, .pa { background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
+.pc-stats small, .pa small { display: block; color: var(--muted); font-size: 0.7rem; }
+.pc-stats b, .pa b { color: var(--gold); }
+.pa.beast { border-color: var(--hope); }
+.pc-tracks { display: grid; gap: 4px; }
+.pc-tracks > div { display: grid; grid-template-columns: 52px 1fr auto; gap: 6px; align-items: center; }
+.pc-tracks b { font-size: 0.8rem; }
+.pboxes { display: inline-flex; flex-wrap: wrap; gap: 3px; }
+.pb { width: 12px; height: 12px; border: 1px solid var(--line2); border-radius: 2px; display: inline-block; }
+.pb.on.hp, .pb.on.stress { background: var(--fear); border-color: var(--fear); }
+.pb.on.hope { background: var(--gold); border-color: var(--gold); }
+.pb.on.armor { background: #6a8ad0; border-color: #6a8ad0; }
+.pc-beast { color: var(--hope); }
+.pc-list { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; }
+.pc-list dt { color: var(--gold); white-space: nowrap; }
+.pc-traits summary { cursor: pointer; color: var(--muted); }
+.pc-traits ul { margin: 6px 0 0 18px; }

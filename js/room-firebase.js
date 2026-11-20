@@ -5,6 +5,8 @@
    資料結構（rooms/<房間代碼>/ 底下）：
      rolls/<自動產生的key>   一筆擲骰：{ uid, t, by, ch, kind, title, text, total, hope?, fear?, hs?, fs?, v? }
      presence/<自動產生的key> 在線的人：{ uid, name }，斷線時自動刪除（同一人開兩個分頁會有兩筆）
+     sheets/<uid>            分享的角色卡摘要：{ t, by, info }，info 是摘要的 JSON 字串（見 party.js）；斷線後保留
+     portraits/<uid>         分享的頭像（data URL 字串），和摘要分開，頭像沒換就不用重送
    uid 是 Firebase 匿名登入給這個瀏覽器的身分代碼，資料庫規則用它限制「只能寫自己的資料」。
    匿名登入不需要玩家操作；身分記在瀏覽器裡，換瀏覽器、無痕視窗或清除網站資料會變成新的身分。
    設定在 js/config.js 的 FIREBASE_CONFIG，建立步驟與資料庫規則見 docs/共享擲骰設定.md。 */
@@ -46,7 +48,8 @@ const RoomFirebase = (() => {
   // modules 只給測試用：可以塞假的 Firebase 進來
   function create(modules) {
     return {
-      async connect({ code, name, onRoll, onPresence, onError }) {
+      // onSheet(uid, 資料或 null)、onPortrait(uid, 字串或 null)：房間裡的角色卡新增 / 更新 / 移除時呼叫（可省略）
+      async connect({ code, name, onRoll, onPresence, onError, onSheet, onPortrait }) {
         const cfg = typeof FIREBASE_CONFIG !== 'undefined' ? FIREBASE_CONFIG : {};
         if (!cfg.databaseURL) {
           throw new Error('還沒有設定 Firebase：請把 firebaseConfig 填進 js/config.js（步驟見 docs/共享擲骰設定.md）');
@@ -84,6 +87,22 @@ const RoomFirebase = (() => {
           (snap) => onPresence(Object.values(snap.val() || {}).map((p) => String(p && p.name ? p.name : '?'))),
           (err) => onError && onError(err)
         );
+        // 角色卡與頭像用子節點事件：只有變動的那一筆會下載，不會每次都重抓全部頭像
+        const watchChildren = (ref, cb) => {
+          if (!cb) return [];
+          const err = (e) => onError && onError(e);
+          return [
+            m.db.onChildAdded(ref, (snap) => cb(snap.key, snap.val()), err),
+            m.db.onChildChanged(ref, (snap) => cb(snap.key, snap.val()), err),
+            m.db.onChildRemoved(ref, (snap) => cb(snap.key, null), err),
+          ];
+        };
+        const sheetsRef = m.db.ref(db, `rooms/${room}/sheets`);
+        const portraitsRef = m.db.ref(db, `rooms/${room}/portraits`);
+        const mySheet = m.db.ref(db, `rooms/${room}/sheets/${uid}`);
+        const myPortrait = m.db.ref(db, `rooms/${room}/portraits/${uid}`);
+        const offSheets = [...watchChildren(sheetsRef, onSheet), ...watchChildren(portraitsRef, onPortrait)];
+
         const offRolls = m.db.onChildAdded(
           m.db.query(rollsRef, m.db.limitToLast(HISTORY)),
           (snap) => onRoll(snap.val(), snap.key),
@@ -94,10 +113,15 @@ const RoomFirebase = (() => {
           room,
           uid,
           push: (roll) => m.db.set(m.db.push(rollsRef), { ...roll, uid }),
+          // 分享自己的角色卡：info 是 JSON 字串；portrait 為 null 時刪除頭像
+          putSheet: (by, info) => m.db.set(mySheet, { t: Date.now(), by, info }),
+          putPortrait: (url) => (url ? m.db.set(myPortrait, url) : m.db.remove(myPortrait)),
+          removeSheet: () => Promise.all([m.db.remove(mySheet), m.db.remove(myPortrait)]),
           async leave() {
             offConnected();
             offPresence();
             offRolls();
+            offSheets.forEach((off) => off());
             await m.db.remove(me).catch(() => {});
           },
         };

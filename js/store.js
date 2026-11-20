@@ -2,6 +2,7 @@
 const Store = (() => {
   const KEY = 'dh-roller-v1';
   let state = { activeId: null, characters: {} };
+  const listeners = []; // 存檔後通知（例如共享房間的角色卡分享）
 
   function load() {
     try {
@@ -25,11 +26,16 @@ const Store = (() => {
     } catch (e) {
       toast('儲存失敗：瀏覽器儲存空間不足或被停用');
     }
+    listeners.forEach((fn) => {
+      try { fn(); } catch (e) { console.warn(e); }
+    });
   }
 
   const list = () => Object.values(state.characters).map((c) => ({ id: c.id, name: c.name }));
   const active = () => state.characters[state.activeId];
   const activeId = () => state.activeId;
+  const get = (id) => state.characters[id];
+  const onSave = (fn) => listeners.push(fn);
 
   function setActive(id) {
     if (state.characters[id]) {
@@ -73,5 +79,5 @@ const Store = (() => {
     return count;
   }
 
-  return { load, save, list, active, activeId, setActive, add, remove, exportActive, importText };
+  return { load, save, list, active, activeId, get, onSave, setActive, add, remove, exportActive, importText };
 })();

@@ -76,8 +76,11 @@ const Room = (() => {
           st.message = describeError(err);
           toast(st.message);
         },
+        onSheet: (uid, v) => Party.onSheet(uid, v),
+        onPortrait: (uid, v) => Party.onPortrait(uid, v),
       });
       st.joined = true;
+      Party.attach(st.conn); // 開始分享自己的角色卡、顯示房間裡的角色卡
       st.message = '';
       saveSettings();
       closeDialog();
@@ -107,6 +110,7 @@ const Room = (() => {
     st.seen = new Set();
     st.people = [];
     saveSettings();
+    Party.detach();
     if (conn) await conn.leave().catch(() => {});
     if (redraw) {
       drawDock();

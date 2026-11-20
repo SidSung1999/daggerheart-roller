@@ -17,6 +17,7 @@ function showView(name) {
   document.querySelectorAll('.main-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
   if (name === 'roller') Roller.render(); // 切過來時重新讀取最新的角色卡資料
+  if (name === 'party') Party.render();
 }
 
 function downloadText(filename, text) {
@@ -49,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Roller.init();
   LevelUp.init();
   FreeRoll.init();
+  Party.init(); // 要在 Room.init 之前：Room 自動回到房間時會呼叫 Party.attach
   Room.init();
   GsImport.init();
   document.getElementById('btnGs').addEventListener('click', () => GsImport.open());

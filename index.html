@@ -24,6 +24,7 @@
     <button type="button" data-view="sheet" class="active">角色卡</button>
     <button type="button" data-view="roller">擲骰器</button>
     <button type="button" data-view="free">自由擲骰</button>
+    <button type="button" data-view="party" title="共享房間裡大家分享的角色卡">隊伍</button>
   </nav>
 </div>
 
@@ -31,6 +32,7 @@
   <section id="view-sheet" class="view active"><div id="sheet"></div></section>
   <section id="view-roller" class="view"><div id="roller"></div></section>
   <section id="view-free" class="view"><div id="freeroll"></div></section>
+  <section id="view-party" class="view"><div id="party"></div></section>
 </main>
 
 <div id="levelup" class="lu-overlay" hidden></div>
@@ -73,6 +75,7 @@
 <script src="js/freeroll.js"></script>
 <script src="js/room-firebase.js"></script>
 <script src="js/room.js"></script>
+<script src="js/party.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
