@@ -37,11 +37,21 @@ const Roller = (() => {
     return r.terms;
   }
 
+  // 擲骰時可用的效果來源：有擲骰設定的角色特性（id 't0'…）與已準備的領域卡（id 'c0'…）。
+  // 特性的設定寫了「取代」另一個特性時，被取代的特性不列出（例如神恩之力取代輝光羽翼）。
+  // 回傳 [{ card, i }]：card 是特性或領域卡本身（都有 name 與 fx），i 是狀態用的 id。
   function preparedCards(target) {
-    return ch()
-      .domainCards.map((card, i) => ({ card, i }))
-      .filter(({ card }) => card.prepared && card.fx.target === target);
+    const c = ch();
+    const replaced = new Set(c.traits.filter((t) => t.fx.target !== 'none' && t.fx.replaces).map((t) => t.fx.replaces.trim()));
+    const traits = c.traits
+      .map((card, i) => ({ card, i: 't' + i }))
+      .filter(({ card }) => card.fx.target === target && !replaced.has(String(card.name).trim()));
+    const cards = c.domainCards.map((card, i) => ({ card, i: 'c' + i })).filter(({ card }) => card.prepared && card.fx.target === target);
+    return [...traits, ...cards];
   }
+
+  // 依狀態用的 id 找回特性或領域卡
+  const sourceById = (id) => (id[0] === 't' ? ch().traits : ch().domainCards)[Number(id.slice(1))];
 
   // 這張卡施法時使用的施法屬性：預設用子職業 Ⅰ 的施法屬性；
   // 卡片屬於兼職職業的領域、而不屬於主職業的領域時，改用子職業 Ⅱ 的施法屬性。
@@ -189,7 +199,7 @@ const Roller = (() => {
 
   function cardRows(target, st) {
     const rows = preparedCards(target);
-    if (!rows.length) return '<p class="muted">沒有已準備且作用於此的領域卡（到角色卡的領域卡區設定「準備」與「擲骰設定」）</p>';
+    if (!rows.length) return '<p class="muted">沒有可用的領域卡或角色特性（到角色卡設定領域卡的「準備」，以及領域卡或角色特性的「擲骰設定」）</p>';
     return rows
       .map(({ card, i }) => {
         const f = card.fx;
@@ -231,7 +241,7 @@ const Roller = (() => {
         ${optionRow('<span>優勢</span><code>+d6</code>', st.adv, 'data-act="adv"')}
         ${exps || '<p class="muted">角色卡尚未填寫經歷</p>'}
       </div>
-      <div class="panel"><h2>領域卡（已準備）</h2>${cardRows('check', st)}</div>
+      <div class="panel"><h2>領域卡與角色特性</h2>${cardRows('check', st)}</div>
       <div class="panel"><h2>額外加值</h2>
         <input type="text" class="extra" data-act="extra" value="${esc(st.extra)}" placeholder="例：+1d6 或 -2（其他來源的加值）">
       </div>
@@ -270,7 +280,7 @@ const Roller = (() => {
       <div class="panel"><h2>武器（熟練值 ${prof}）</h2>
         <select class="extra" data-act="src">${srcOpts}</select>
       </div>
-      <div class="panel"><h2>領域卡（已準備，加到傷害）</h2>${cardRows('damage', st)}</div>
+      <div class="panel"><h2>領域卡與角色特性（加到傷害）</h2>${cardRows('damage', st)}</div>
       <div class="panel"><h2>額外加值</h2>
         <input type="text" class="extra" data-act="extra" value="${esc(st.extra)}" placeholder="例：+1d6 或 +2（種族/職業特性等）">
       </div>
@@ -361,7 +371,7 @@ const Roller = (() => {
 
   function rollSpell(i) {
     const st = S().damage;
-    const card = ch().domainCards[i];
+    const card = sourceById(i);
     if (!card) return;
     const errors = [];
     const prof = Number(ch().proficiency) || 1;
@@ -415,7 +425,7 @@ const Roller = (() => {
       if (sub === 'damage') rollDamage();
       else rollCheck(sub);
     } else if (act === 'spell') {
-      rollSpell(Number(btn.dataset.i));
+      rollSpell(btn.dataset.i);
     }
   }
 

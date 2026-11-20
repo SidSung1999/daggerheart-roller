@@ -63,7 +63,12 @@ function setAutoTraits(c, kind, rows) {
   c.traits.forEach((t, i) => {
     if (t.auto && AUTO_ORDER.indexOf(t.auto) < rank) at = i + 1;
   });
-  c.traits.splice(at, 0, ...rows.map((r) => ({ ...TEMPLATES.traits(), ...r, auto: kind })));
+  const made = rows.map((r) => {
+    const t = { ...TEMPLATES.traits(), ...r, auto: kind };
+    applyTraitFx(t); // 套用這個特性的預設擲骰設定（如果有）
+    return t;
+  });
+  c.traits.splice(at, 0, ...made);
 }
 
 const removeAuto = (c, kinds) => {

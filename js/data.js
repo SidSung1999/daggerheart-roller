@@ -26,6 +26,17 @@ function emptyWeapon() {
   return { name: '', trait: '', features: '', range: '', damage: '', type: '', hands: '' };
 }
 
+// 擲骰設定（領域卡與角色特性共用）。
+// target：作用（none / damage / check / standalone）；formula：骰子公式；scaleProf：第一組骰子乘以熟練值；
+// condLabel / condFormula：條件成立時追加的公式；
+// perUnit：效果依擲骰時消耗的資源量 N 重複（公式乘以 N）；unitDiceOnly：只乘第一組骰子，固定加值只算一次；
+// unitSpellcast：N 預設帶入施法屬性值；unitLabel 是資源名稱；unitMax 是 N 的上限（0 為不限）；
+// replaces：這個效果取代另一個特性的效果（填特性名稱），被取代的特性不會出現在擲骰器（例如升級後數值變大）
+const defaultFx = () => ({
+  target: 'none', formula: '', scaleProf: false, condLabel: '', condFormula: '',
+  perUnit: false, unitDiceOnly: false, unitSpellcast: false, unitLabel: '', unitMax: 0, replaces: '',
+});
+
 const TEMPLATES = {
   experiences: () => ({ name: '', bonus: 2 }),
   inventoryWeapons: () => emptyWeapon(),
@@ -36,12 +47,12 @@ const TEMPLATES = {
     prepared: false,
     name: '',
     desc: '',
-    // perUnit：效果依擲骰時消耗的資源量 N 重複（公式乘以 N）；unitDiceOnly：只乘第一組骰子，固定加值只算一次；unitSpellcast：N 預設帶入施法屬性值（依子職業的施法屬性）；unitLabel 是資源名稱；unitMax 是 N 的上限（0 為不限）
-    fx: { target: 'none', formula: '', scaleProf: false, condLabel: '', condFormula: '', perUnit: false, unitDiceOnly: false, unitSpellcast: false, unitLabel: '', unitMax: 0 },
+    fx: defaultFx(),
   }),
   items: () => ({ name: '', qty: 1, desc: '' }),
-  // auto：從職業 / 子職自動加入的特性種類（class / foundation / specialization / mastery），手動新增的為空字串
-  traits: () => ({ source: '', name: '', desc: '', auto: '' }),
+  // auto：從職業 / 子職 / 種族等自動加入的特性種類，手動新增的為空字串
+  // fx：擲骰設定（見 defaultFx）；fxChecked：自動加入的特性是否已套用過 trait-fx.js 的預設
+  traits: () => ({ source: '', name: '', desc: '', auto: '', fx: defaultFx(), fxChecked: false }),
 };
 
 // 新角色的初始物品
@@ -190,6 +201,14 @@ function migrateArmorStats(c) {
   delete c.severeThreshold;
 }
 
+// 自動加入的特性，套用 trait-fx.js 裡該特性的預設擲骰設定（每個特性只套用一次，之後玩家改的設定不會被蓋掉）
+function applyTraitFx(t) {
+  if (t.fxChecked) return;
+  const d = typeof TRAIT_FX !== 'undefined' ? TRAIT_FX[t.name] : undefined;
+  if (t.auto && d) Object.assign(t.fx, d);
+  t.fxChecked = true;
+}
+
 function normalizeCharacter(c) {
   migrateArmorStats(c);
   fillDefaults(c, blankCharacter());
@@ -197,6 +216,7 @@ function normalizeCharacter(c) {
     if (!Array.isArray(c[k])) c[k] = [];
     c[k] = c[k].map((it) => fillDefaults(it && typeof it === 'object' ? it : {}, TEMPLATES[k]()));
   });
+  c.traits.forEach(applyTraitFx); // 舊角色已經自動加入的特性，補上預設擲骰設定
   if (!Array.isArray(c.domains)) c.domains = ['', ''];
   if (!Array.isArray(c.domains2)) c.domains2 = ['', ''];
   if (!Array.isArray(c.ancestryMix) || c.ancestryMix.length !== 2) c.ancestryMix = ['', ''];

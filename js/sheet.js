@@ -177,13 +177,33 @@ const Sheet = (() => {
     toast(`已加入「${src.name}」`);
   }
 
+  // 擲骰設定（領域卡與角色特性共用）。p 是資料路徑前綴，例如 domainCards.3 或 traits.2
+  function fxBlock(p, fx, withReplaces = false) {
+    const target = EFFECT_TARGETS.find((t) => t.value === fx.target);
+    const badge = fx.target !== 'none' ? `<em class="badge">${esc(target ? target.label : '')}</em>` : '';
+    const opts = EFFECT_TARGETS.map(
+      (t) => `<option value="${t.value}" ${fx.target === t.value ? 'selected' : ''}>${t.label}</option>`
+    ).join('');
+    return `<details class="fx">
+        <summary>擲骰設定 ${badge}</summary>
+        <div class="fx-grid">
+          <label>作用<select data-bind="${p}.fx.target">${opts}</select></label>
+          <label>公式<input type="text" data-bind="${p}.fx.formula" value="${esc(fx.formula)}" placeholder="例：d8+2 或 d12"></label>
+          <label class="inline">${check(p + '.fx.scaleProf')} 第一組骰子的數量乘以熟練值</label>
+          <label class="inline">${check(p + '.fx.perUnit')} 依消耗的資源決定次數：公式乘以 N，N 在擲骰時填</label>
+          <label class="inline">${check(p + '.fx.unitDiceOnly')} 只乘第一組骰子（固定加值只算一次，例如 d8+6 變成 Nd8+6）</label>
+          <label class="inline">${check(p + '.fx.unitSpellcast')} N 預設帶入施法屬性值（依子職業的施法屬性，擲骰時仍可修改）</label>
+          <label>資源名稱（選填）<input type="text" data-bind="${p}.fx.unitLabel" value="${esc(fx.unitLabel)}" placeholder="例：標記的壓力點"></label>
+          <label>N 的上限（選填，0 為不限）${num(p + '.fx.unitMax', 'min="0"')}</label>
+          <label>條件說明<input type="text" data-bind="${p}.fx.condLabel" value="${esc(fx.condLabel)}" placeholder="例：目標處於脆弱"></label>
+          <label>條件成立時追加<input type="text" data-bind="${p}.fx.condFormula" value="${esc(fx.condFormula)}" placeholder="例：1d8"></label>
+          ${withReplaces ? `<label class="wide">取代另一個特性（選填）<input type="text" data-bind="${p}.fx.replaces" value="${esc(fx.replaces)}" placeholder="特性名稱，例：輝光羽翼。兩個都在身上時，擲骰器只列出這一個"></label>` : ''}
+        </div>
+      </details>`;
+  }
+
   function domainCardRow(card, i) {
     const p = `domainCards.${i}`;
-    const target = EFFECT_TARGETS.find((t) => t.value === card.fx.target);
-    const badge = card.fx.target !== 'none' ? `<em class="badge">${esc(target ? target.label : '')}</em>` : '';
-    const opts = EFFECT_TARGETS.map(
-      (t) => `<option value="${t.value}" ${card.fx.target === t.value ? 'selected' : ''}>${t.label}</option>`
-    ).join('');
     return `<div class="dcard ${card.prepared ? 'prepared' : ''}">
       <div class="dcard-top">
         <label class="prep" title="準備（最多 ${MAX_PREPARED} 張）">${check(p + '.prepared', 'data-prep')}<span>準備</span></label>
@@ -194,21 +214,7 @@ const Sheet = (() => {
         <button type="button" class="x" data-del="domainCards.${i}" aria-label="刪除領域卡">✕</button>
       </div>
       ${area(p + '.desc', 3, '卡片描述')}
-      <details class="fx">
-        <summary>擲骰設定 ${badge}</summary>
-        <div class="fx-grid">
-          <label>作用<select data-bind="${p}.fx.target">${opts}</select></label>
-          <label>公式<input type="text" data-bind="${p}.fx.formula" value="${esc(card.fx.formula)}" placeholder="例：d8+2 或 d12"></label>
-          <label class="inline">${check(p + '.fx.scaleProf')} 第一組骰子的數量乘以熟練值</label>
-          <label class="inline">${check(p + '.fx.perUnit')} 依消耗的資源決定次數：公式乘以 N，N 在擲骰時填</label>
-          <label class="inline">${check(p + '.fx.unitDiceOnly')} 只乘第一組骰子（固定加值只算一次，例如 d8+6 變成 Nd8+6）</label>
-          <label class="inline">${check(p + '.fx.unitSpellcast')} N 預設帶入施法屬性值（依子職業的施法屬性，擲骰時仍可修改）</label>
-          <label>資源名稱（選填）<input type="text" data-bind="${p}.fx.unitLabel" value="${esc(card.fx.unitLabel)}" placeholder="例：標記的壓力點"></label>
-          <label>N 的上限（選填，0 為不限）${num(p + '.fx.unitMax', 'min="0"')}</label>
-          <label>條件說明<input type="text" data-bind="${p}.fx.condLabel" value="${esc(card.fx.condLabel)}" placeholder="例：目標處於脆弱"></label>
-          <label>條件成立時追加<input type="text" data-bind="${p}.fx.condFormula" value="${esc(card.fx.condFormula)}" placeholder="例：1d8"></label>
-        </div>
-      </details>
+      ${fxBlock(p, card.fx)}
     </div>`;
   }
 
@@ -462,11 +468,14 @@ const Sheet = (() => {
 
     const traits = c.traits
       .map(
-        (t, i) => `<div class="list-row traits">
-          ${text(`traits.${i}.source`, '來源')}
-          ${text(`traits.${i}.name`, '名稱')}
-          ${area(`traits.${i}.desc`, 2, '描述')}
-          <button type="button" class="x" data-del="traits.${i}" aria-label="刪除">✕</button>
+        (t, i) => `<div class="trait-item">
+          <div class="list-row traits">
+            ${text(`traits.${i}.source`, '來源')}
+            ${text(`traits.${i}.name`, '名稱')}
+            ${area(`traits.${i}.desc`, 2, '描述')}
+            <button type="button" class="x" data-del="traits.${i}" aria-label="刪除">✕</button>
+          </div>
+          ${fxBlock(`traits.${i}`, t.fx, true)}
         </div>`
       )
       .join('');
