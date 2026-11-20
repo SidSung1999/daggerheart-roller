@@ -385,16 +385,20 @@ const GsImport = (() => {
     } catch (e) { /* 存不了就算了，下次重填 */ }
   };
 
+  // js/config.js 裡設定的 API Key（測試時可以替換 config.key）
+  const config = { key: () => (typeof GOOGLE_API_KEY !== 'undefined' ? String(GOOGLE_API_KEY).trim() : '') };
+
   function drawForm(message = '', busy = false) {
     const s = load();
-    const key = s.key || (typeof GOOGLE_API_KEY !== 'undefined' ? GOOGLE_API_KEY : '');
+    const configured = !!config.key();
     box().innerHTML = `<div class="lu-modal" role="dialog" aria-modal="true" aria-label="從 Google 試算表匯入">
       <h2>從 Google 試算表匯入</h2>
       <p class="muted">一次性匯入成一個新角色。試算表要共用為「知道連結的人可檢視」，並有一個「匯出頁」分頁（格式見 docs/匯出頁格式.md）。</p>
       <div class="gs-form">
         <label class="hf"><span>試算表網址</span><input type="text" id="gsUrl" value="${esc(s.url || '')}" placeholder="https://docs.google.com/spreadsheets/d/…"></label>
         <label class="hf"><span>分頁名稱</span><input type="text" id="gsTab" value="${esc(s.tab || '匯出頁')}"></label>
-        <label class="hf"><span>Google API Key</span><input type="text" id="gsKey" value="${esc(key)}" placeholder="AIza…"></label>
+        ${configured ? '' : `<label class="hf"><span>Google API Key</span><input type="text" id="gsKey" value="${esc(s.key || '')}" placeholder="AIza…"></label>
+        <p class="muted">也可以把金鑰填進 js/config.js 的 GOOGLE_API_KEY，之後就不用再輸入。</p>`}
       </div>
       <p class="lu-err">${message ? esc(message) : '&nbsp;'}</p>
       <div class="lu-actions">
@@ -429,8 +433,10 @@ const GsImport = (() => {
 
   async function run() {
     const val = (id) => document.getElementById(id)?.value || '';
-    const settings = { url: val('gsUrl').trim(), tab: val('gsTab').trim() || '匯出頁', key: val('gsKey').trim() };
-    save(settings);
+    // 已經在 config.js 設定金鑰時直接使用，不另外存一份到瀏覽器
+    const configured = !!config.key();
+    const settings = { url: val('gsUrl').trim(), tab: val('gsTab').trim() || '匯出頁', key: configured ? config.key() : val('gsKey').trim() };
+    save({ url: settings.url, tab: settings.tab, key: configured ? '' : settings.key });
     drawForm('', true); // 重畫時會讀回剛存的設定
     try {
       const rows = await fetchRows(settings);
@@ -440,7 +446,8 @@ const GsImport = (() => {
       renderAll();
       drawResult(Store.active(), warnings, summary);
     } catch (e) {
-      drawForm(e.message || '匯入失敗');
+      const hint = configured && /API Key/.test(e.message || '') ? '（請檢查 js/config.js 的 GOOGLE_API_KEY）' : '';
+      drawForm((e.message || '匯入失敗') + hint);
     }
   }
 
@@ -457,5 +464,5 @@ const GsImport = (() => {
     });
   }
 
-  return { init, open, parseSheetId, fetchRows, characterFromRows };
+  return { init, open, parseSheetId, fetchRows, characterFromRows, config };
 })();

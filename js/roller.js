@@ -13,7 +13,7 @@ const Roller = (() => {
   const signed = (n) => (n >= 0 ? '+' : '') + n;
   const flatTerm = (n) => ({ kind: 'flat', sign: n < 0 ? -1 : 1, value: Math.abs(n) });
 
-  const newCheckState = () => ({ attr: null, adv: false, exp: {}, cards: {}, cond: {}, units: {}, extra: '' });
+  const newCheckState = () => ({ attr: null, adv: 0, exp: {}, cards: {}, cond: {}, units: {}, extra: '' });
 
   function S() {
     const id = ch().id;
@@ -140,7 +140,13 @@ const Roller = (() => {
       const v = Number(c.attrs[st.attr].value) || 0;
       if (v !== 0) items.push({ label: `${a.label}`, terms: [flatTerm(v)] });
     }
-    if (st.adv) items.push({ label: '優勢', terms: Dice.parse('d6').terms });
+    // 優勢：每個優勢擲一顆 d6，有好幾個優勢時全部一起擲、只取最高的加上去
+    const advN = Math.max(0, Math.min(9, Math.floor(Number(st.adv)) || 0));
+    if (advN) {
+      const die = { kind: 'dice', sign: 1, count: advN, sides: 6 };
+      if (advN > 1) die.keep = { mode: 'h', n: 1 };
+      items.push({ label: advN > 1 ? `優勢 ×${advN}（取最高）` : '優勢', terms: [die] });
+    }
     c.experiences.forEach((e, i) => {
       if (st.exp[i] && e.name.trim()) {
         const b = Number(e.bonus) || 0;
@@ -238,7 +244,11 @@ const Roller = (() => {
     return `
       <div class="panel"><h2>使用屬性</h2><div class="attr-grid">${attrs}</div></div>
       <div class="panel"><h2>加值選項</h2>
-        ${optionRow('<span>優勢</span><code>+d6</code>', st.adv, 'data-act="adv"')}
+        <div class="opt ${Number(st.adv) > 0 ? 'on' : ''}">
+          <span>優勢<small class="muted">　有幾個優勢就填幾個：擲同樣數量的 d6，取最高的加上去</small></span>
+          <code>+d6</code>
+          <span class="unit"><input type="number" min="0" max="9" value="${Number(st.adv) || 0}" data-act="advn" aria-label="優勢數量"></span>
+        </div>
         ${exps || '<p class="muted">角色卡尚未填寫經歷</p>'}
       </div>
       <div class="panel"><h2>領域卡與角色特性</h2>${cardRows('check', st)}</div>
@@ -436,7 +446,11 @@ const Roller = (() => {
     const st = S()[sub];
     const i = el.dataset.i;
 
-    if (act === 'adv') st.adv = el.checked;
+    if (act === 'advn') {
+      st.adv = Math.max(0, Math.min(9, Math.floor(Number(el.value)) || 0));
+      const row = el.closest('.opt');
+      if (row) row.classList.toggle('on', st.adv > 0);
+    }
     else if (act === 'exp') st.exp[i] = el.checked;
     else if (act === 'card') st.cards[i] = el.checked;
     else if (act === 'cond') st.cond[i] = el.checked;

@@ -8,6 +8,8 @@ const Dice = (() => {
   }
 
   // "d8+2" -> { ok:true, terms:[{kind:'dice',sign:1,count:1,sides:8},{kind:'flat',sign:1,value:2}] }
+  // 也支援取高 / 取低：3d6kh1 = 擲 3 顆 d6 只留最高 1 顆；4d6kh3、2d20kl1 同理（kh、kl 後面沒寫數字就是 1）。
+  // 這種骰子項會多一個 keep: { mode: 'h' | 'l', n }
   function parse(str) {
     const s = String(str == null ? '' : str)
       .replace(/\s+/g, '')
@@ -16,7 +18,7 @@ const Dice = (() => {
       .toLowerCase();
     if (!s) return { ok: true, terms: [] };
 
-    const re = /([+-]?)(?:(\d*)d(\d+)|(\d+))/y;
+    const re = /([+-]?)(?:(\d*)d(\d+)(?:k([hl])(\d*))?|(\d+))/y;
     const terms = [];
     let idx = 0;
     while (idx < s.length) {
@@ -31,9 +33,15 @@ const Dice = (() => {
         if (count < 1 || count > MAX_COUNT || sides < 2 || sides > MAX_SIDES) {
           return { ok: false, terms: [] };
         }
-        terms.push({ kind: 'dice', sign, count, sides });
+        const term = { kind: 'dice', sign, count, sides };
+        if (m[4]) {
+          const n = m[5] === '' ? 1 : parseInt(m[5], 10);
+          if (n < 1) return { ok: false, terms: [] };
+          if (n < count) term.keep = { mode: m[4], n }; // 全部都留下來就等於沒有取高 / 取低
+        }
+        terms.push(term);
       } else {
-        terms.push({ kind: 'flat', sign, value: parseInt(m[4], 10) });
+        terms.push({ kind: 'flat', sign, value: parseInt(m[6], 10) });
       }
       idx = re.lastIndex;
     }
@@ -52,7 +60,8 @@ const Dice = (() => {
     const out = terms
       .map((t) => {
         const sg = t.sign < 0 ? '-' : '+';
-        return t.kind === 'dice' ? `${sg}${t.count}d${t.sides}` : `${sg}${t.value}`;
+        const keep = t.keep ? `k${t.keep.mode}${t.keep.n}` : '';
+        return t.kind === 'dice' ? `${sg}${t.count}d${t.sides}${keep}` : `${sg}${t.value}`;
       })
       .join('');
     return out.replace(/^\+/, '');
@@ -78,9 +87,18 @@ const Dice = (() => {
       if (t.kind === 'dice') {
         const rolls = [];
         for (let i = 0; i < t.count; i++) rolls.push(rng(t.sides));
-        const sum = rolls.reduce((a, b) => a + b, 0);
+        // 取高 / 取低：只計入留下來的骰子，沒留下的在說明裡用括號標示
+        const kept = new Set(rolls.map((_, i) => i));
+        if (t.keep) {
+          const order = rolls.map((_, i) => i).sort((a, b) => (t.keep.mode === 'h' ? rolls[b] - rolls[a] : rolls[a] - rolls[b]) || a - b);
+          kept.clear();
+          order.slice(0, t.keep.n).forEach((i) => kept.add(i));
+        }
+        const sum = rolls.reduce((a, r, i) => a + (kept.has(i) ? r : 0), 0);
         total += t.sign * sum;
-        pieces.push(`${t.sign < 0 ? '-' : ''}${t.count}d${t.sides} [${rolls.join(', ')}] = ${sum}`);
+        const shown = rolls.map((r, i) => (kept.has(i) ? r : `(${r})`)).join(', ');
+        const keepLabel = t.keep ? `k${t.keep.mode}${t.keep.n}` : '';
+        pieces.push(`${t.sign < 0 ? '-' : ''}${t.count}d${t.sides}${keepLabel} [${shown}] = ${sum}`);
       } else {
         total += t.sign * t.value;
         pieces.push(`${t.sign < 0 ? '-' : '+'}${t.value}`);

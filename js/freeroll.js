@@ -37,6 +37,7 @@ const FreeRoll = (() => {
           <label class="hf"><span>優勢 / 劣勢</span>
             <select id="frAdv"><option value="0">無</option><option value="1">優勢（+d6）</option><option value="-1">劣勢（−d6）</option></select>
           </label>
+          <label class="hf"><span title="有幾個就填幾個：擲同樣數量的 d6，取最高的">數量</span><input type="number" id="frAdvN" min="1" max="9" value="1"></label>
         </div>
         <button type="button" class="roll-btn" data-fr="duality">🎲 擲二元骰</button>
       </div>
@@ -127,7 +128,10 @@ const FreeRoll = (() => {
     const adv = Number($('#frAdv').value) || 0;
     const hope = Dice.roll(hopeSides);
     const fear = Dice.roll(fearSides);
-    const advDie = adv ? Dice.roll(6) : 0;
+    // 有好幾個優勢（或劣勢）時，擲同樣數量的 d6，只取最高的
+    const advN = Math.max(1, Math.min(9, Math.floor(Number($('#frAdvN').value)) || 1));
+    const advRolls = adv ? Array.from({ length: advN }, () => Dice.roll(6)) : [];
+    const advDie = advRolls.length ? Math.max(...advRolls) : 0;
     const total = hope + fear + mod + adv * advDie;
 
     let verdict = '<div class="verdict hope">☀ 帶著希望</div>';
@@ -142,7 +146,12 @@ const FreeRoll = (() => {
 
     const lines = [`希望骰 d${hopeSides}：${hope}`, `恐懼骰 d${fearSides}：${fear}`];
     if (mod) lines.push(`修正值：${signed(mod)}`);
-    if (adv) lines.push(`${adv > 0 ? '優勢' : '劣勢'} d6：${adv > 0 ? '+' : '−'}${advDie}`);
+    if (adv) {
+      const name = adv > 0 ? '優勢' : '劣勢';
+      lines.push(advN > 1
+        ? `${name} ${advN}d6 取最高：[${advRolls.join(', ')}] → ${adv > 0 ? '+' : '−'}${advDie}`
+        : `${name} d6：${adv > 0 ? '+' : '−'}${advDie}`);
+    }
 
     $('#frResult').innerHTML = `<div class="result">
       <div class="dh">
@@ -153,7 +162,7 @@ const FreeRoll = (() => {
       <div class="breakdown">${lines.map((x) => `<div>${esc(x)}</div>`).join('')}</div>
       <div class="total">${total}</div><small class="muted">總計</small>
     </div>`;
-    const title = `二元骰 d${hopeSides}+d${fearSides}${mod ? signed(mod) : ''}${adv ? (adv > 0 ? ' 優勢' : ' 劣勢') : ''}`;
+    const title = `二元骰 d${hopeSides}+d${fearSides}${mod ? signed(mod) : ''}${adv ? (adv > 0 ? ' 優勢' : ' 劣勢') + (advN > 1 ? `×${advN}` : '') : ''}`;
     log(title, total, `${hope} / ${fear}　${verdictText}`);
     Room.publish({
       kind: 'duality',

@@ -569,8 +569,11 @@ const Sheet = (() => {
         <div class="col side">
           ${section(
             '頭像',
-            `<div class="portrait">${c.portrait ? `<img src="${esc(c.portrait)}" alt="頭像">` : '<span>頭像</span>'}</div>
-             ${text('portrait', '圖片網址')}`
+            `<label class="portrait" title="點擊選擇圖片，或把圖片拖放到這裡">
+               ${c.portrait ? `<img src="${esc(c.portrait)}" alt="頭像">` : '<span>點擊上傳<br>或拖放圖片</span>'}
+               <input type="file" accept="image/*" data-portrait-file hidden>
+             </label>
+             ${c.portrait ? '<button type="button" class="add" data-portrait-clear>移除頭像</button>' : ''}`
           )}
           ${section('領域', `${text('domains.0', '領域 1', 'list="domainList"')}${text('domains.1', '領域 2', 'list="domainList"')}${domains2Field()}`)}
           ${section('金幣', text('gold'))}
@@ -704,8 +707,30 @@ const Sheet = (() => {
     }
   }
 
+  // 頭像：縮小壓縮後直接存進角色資料，不需要圖片網址
+  async function setPortrait(file) {
+    if (!file) return;
+    const id = ch().id;
+    try {
+      const url = await ImageUtil.fileToDataUrl(file);
+      if (ch().id !== id) return; // 處理期間切換了角色
+      ch().portrait = url;
+      Store.save();
+      render();
+    } catch (e) {
+      toast(e.message || '頭像上傳失敗');
+    }
+  }
+
   function onChange(e) {
     const el = e.target;
+    // 選了頭像圖片檔
+    if (el.dataset && el.dataset.portraitFile !== undefined) {
+      const file = el.files && el.files[0];
+      el.value = ''; // 之後選同一個檔案也會觸發
+      return setPortrait(file);
+    }
+
     // 輸入的武器名稱符合武器清單時，自動帶入其他欄位
     if (el.dataset && el.dataset.weapon) {
       const w = WEAPONS.find((x) => x.name === el.value);
@@ -751,13 +776,19 @@ const Sheet = (() => {
         refreshTotals(); // 護甲值與傷害閾值讀自護甲，跟著更新
       }
     }
-    if (el.dataset && el.dataset.bind === 'portrait') render();
     if (el.dataset && el.dataset.bind === 'level') render();
   }
 
   function onClick(e) {
     const btn = e.target.closest('button');
     if (!btn) return;
+
+    if (btn.dataset.portraitClear !== undefined) {
+      ch().portrait = '';
+      Store.save();
+      render();
+      return;
+    }
 
     if (btn.dataset.levelup !== undefined) {
       LevelUp.open();
@@ -826,6 +857,25 @@ const Sheet = (() => {
     r.addEventListener('input', onInput);
     r.addEventListener('change', onChange);
     r.addEventListener('click', onClick);
+
+    // 把圖片檔拖放到頭像框上
+    r.addEventListener('dragover', (e) => {
+      const box = e.target.closest && e.target.closest('.portrait');
+      if (!box) return;
+      e.preventDefault();
+      box.classList.add('drag');
+    });
+    r.addEventListener('dragleave', (e) => {
+      const box = e.target.closest && e.target.closest('.portrait');
+      if (box) box.classList.remove('drag');
+    });
+    r.addEventListener('drop', (e) => {
+      const box = e.target.closest && e.target.closest('.portrait');
+      if (!box) return;
+      e.preventDefault();
+      box.classList.remove('drag');
+      setPortrait(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
   }
 
   // 升級完成後：展開領域卡庫並捲到那裡，方便接著選領域卡

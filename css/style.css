@@ -164,6 +164,8 @@ main { padding: 16px; max-width: 1200px; margin: 0 auto; }
   display: flex; align-items: center; justify-content: center; color: var(--muted); margin-bottom: 8px; overflow: hidden;
 }
 .portrait img { width: 100%; height: 100%; object-fit: cover; }
+.portrait { cursor: pointer; text-align: center; font-size: 0.8rem; line-height: 1.6; }
+.portrait:hover, .portrait.drag { border-color: var(--gold); color: var(--gold); }
 .side input { margin-bottom: 6px; }
 
 /* ---------- 領域卡 ---------- */
@@ -354,7 +356,7 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
 .fr-quick button, .fr-clear { background: var(--field); color: var(--text); border: 1px solid var(--line2); border-radius: 6px; padding: 6px 12px; font-size: 0.85rem; }
 .fr-quick button:hover, .fr-clear:hover { border-color: var(--gold); color: var(--gold); }
 .fr-clear { margin-left: auto; padding: 3px 10px; font-size: 0.75rem; }
-.fr-duality { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+.fr-duality { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
 .fr-log { list-style: none; max-height: 320px; overflow-y: auto; font-size: 0.85rem; }
 .fr-log li { padding: 5px 0; border-bottom: 1px solid var(--line); font-family: monospace; }
 .fr-time { color: var(--muted); }
@@ -400,3 +402,4 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
 .trait-item .list-row { margin-bottom: 2px; }
 .trait-item details.fx { margin: 0 34px 4px 0; }
 .fx-grid label.wide { grid-column: 1 / -1; }
+.opt small.muted { font-size: 0.72rem; }
