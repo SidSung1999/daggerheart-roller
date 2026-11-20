@@ -148,6 +148,7 @@ const Room = (() => {
     const item = {
       key,
       t: num(roll.t),
+      uid: String(roll.uid || ''),
       by: String(roll.by || '?').slice(0, 40),
       ch: String(roll.ch || '').slice(0, 40),
       title: String(roll.title || '').slice(0, 200),
@@ -171,7 +172,9 @@ const Room = (() => {
   };
 
   function itemHtml(r) {
-    const mine = r.by === st.name;
+    // 自己的擲骰：有 uid 時用 uid 判斷（顯示名稱可能重複），舊紀錄沒有 uid 才比名稱
+    const myUid = st.conn && st.conn.uid;
+    const mine = r.uid && myUid ? r.uid === myUid : r.by === st.name;
     const who = `${esc(r.by)}${r.ch && r.ch !== r.by ? `<small>（${esc(r.ch)}）</small>` : ''}`;
     const dice = r.dice
       ? `<div class="rd-dice"><span class="hope">☀ d${r.dice.hs}：${r.dice.hope}</span><span class="fear">🌑 d${r.dice.fs}：${r.dice.fear}</span><span class="verdict-tag ${esc(r.dice.v)}">${esc(VERDICTS[r.dice.v])}</span></div>`
