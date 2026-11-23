@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Party.init(); // 要在 Room.init 之前：Room 自動回到房間時會呼叫 Party.attach
   Room.init();
   GsImport.init();
+  FxExport.init();
   document.getElementById('btnGs').addEventListener('click', () => GsImport.open());
   renderAll();
 

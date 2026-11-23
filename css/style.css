@@ -460,3 +460,6 @@ code { font-family: monospace; color: var(--gold); background: #2a2210; padding:
 .pc-list dt { color: var(--gold); white-space: nowrap; }
 .pc-traits summary { cursor: pointer; color: var(--muted); }
 .pc-traits ul { margin: 6px 0 0 18px; }
+
+/* ---------- 匯出擲骰設定 ---------- */
+.fx-out { width: 100%; font-family: monospace; font-size: 0.8rem; margin: 10px 0; white-space: pre; }
