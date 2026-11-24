@@ -19,6 +19,7 @@ const EFFECT_TARGETS = [
   { value: 'damage', label: '加到傷害' },
   { value: 'check', label: '加到檢定' },
   { value: 'standalone', label: '獨立傷害（法術）' },
+  { value: 'advantage', label: '檢定優勢（+1 優勢骰）' }, // 擲骰器勾選時，動作 / 反應檢定的優勢數量 +1，不用填公式
 ];
 
 function emptyWeapon() {
@@ -30,12 +31,41 @@ function emptyWeapon() {
 // target：作用（none / damage / check / standalone）；formula：骰子公式；scaleProf：第一組骰子乘以熟練值；
 // condLabel / condFormula：條件成立時追加的公式；
 // perUnit：效果依擲骰時消耗的資源量 N 重複（公式乘以 N）；unitDiceOnly：只乘第一組骰子，固定加值只算一次；
-// unitSpellcast：N 預設帶入施法屬性值；unitLabel 是資源名稱；unitMax 是 N 的上限（0 為不限）；
-// replaces：這個效果取代另一個特性的效果（填特性名稱），被取代的特性不會出現在擲骰器（例如升級後數值變大）
+// unitSpellcast：N 預設帶入施法屬性值；unitLabel 是資源名稱；
+// scaleTier：乘以角色的階級（等級 1 / 2-4 / 5-7 / 8-10 → 1 / 2 / 3 / 4），'dice' 只乘第一組骰子、'all' 整個公式、'' 不乘。
+// 角色卡上 scaleProf / perUnit / unitDiceOnly / unitSpellcast / scaleTier 合成一個「倍數」下拉選單（FX_MODES）。
+// 公式裡可以寫屬性名稱（敏捷、力量、技巧、直覺、風采、知識），擲骰時帶入角色的屬性值，例如「力量」「1d6+力量」。
 const defaultFx = () => ({
   target: 'none', formula: '', scaleProf: false, condLabel: '', condFormula: '',
-  perUnit: false, unitDiceOnly: false, unitSpellcast: false, unitLabel: '', unitMax: 0, replaces: '',
+  perUnit: false, unitDiceOnly: false, unitSpellcast: false, unitLabel: '', scaleTier: '',
 });
+
+// 「倍數」選單的選項，以及每個選項對應的四個欄位值（四個欄位一起設定，不會互相衝突）
+const FX_MODES = [
+  { value: 'none', label: '不乘（照公式擲）', set: {} },
+  { value: 'prof', label: '第一組骰子 × 熟練值', set: { scaleProf: true } },
+  { value: 'tierDice', label: '第一組骰子 × 階級', set: { scaleTier: 'dice' } },
+  { value: 'tierAll', label: '整個公式 × 階級', set: { scaleTier: 'all' } },
+  { value: 'unit', label: '整個公式 × N（N 在擲骰時填）', set: { perUnit: true } },
+  { value: 'unitDice', label: '只有第一組骰子 × N（固定加值只算一次）', set: { perUnit: true, unitDiceOnly: true } },
+  { value: 'unitSpell', label: '整個公式 × （施法屬性）', set: { perUnit: true, unitSpellcast: true } },
+  { value: 'unitDiceSpell', label: '只有第一組骰子 × （施法屬性）', set: { perUnit: true, unitDiceOnly: true, unitSpellcast: true } },
+];
+const FX_MODE_KEYS = ['scaleProf', 'perUnit', 'unitDiceOnly', 'unitSpellcast', 'scaleTier'];
+
+// 目前的設定對應哪個選項（舊資料同時勾了熟練值與 N 時，以 N 為準）
+function fxMode(fx) {
+  if (fx.scaleTier === 'dice' || fx.scaleTier === 'all') return fx.scaleTier === 'dice' ? 'tierDice' : 'tierAll';
+  if (!fx.perUnit) return fx.scaleProf ? 'prof' : 'none';
+  return `unit${fx.unitDiceOnly ? 'Dice' : ''}${fx.unitSpellcast ? 'Spell' : ''}`;
+}
+
+function setFxMode(fx, value) {
+  const m = FX_MODES.find((x) => x.value === value);
+  if (!m) return;
+  const d = defaultFx();
+  FX_MODE_KEYS.forEach((k) => (fx[k] = m.set[k] !== undefined ? m.set[k] : d[k]));
+}
 
 const TEMPLATES = {
   experiences: () => ({ name: '', bonus: 2 }),
@@ -220,6 +250,11 @@ function normalizeCharacter(c) {
     c[k] = c[k].map((it) => fillDefaults(it && typeof it === 'object' ? it : {}, TEMPLATES[k]()));
   });
   c.traits.forEach(applyTraitFx); // 舊角色已經自動加入的特性，補上預設擲骰設定
+  // 已移除的擲骰設定欄位：N 的上限、取代另一個特性
+  [...c.traits, ...c.domainCards].forEach((x) => {
+    delete x.fx.unitMax;
+    delete x.fx.replaces;
+  });
   if (!Array.isArray(c.domains)) c.domains = ['', ''];
   if (!Array.isArray(c.domains2)) c.domains2 = ['', ''];
   ['forms', 'advantages', 'abilities'].forEach((k) => {

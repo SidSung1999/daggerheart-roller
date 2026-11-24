@@ -3,20 +3,19 @@
    而且每個特性只套用一次，之後玩家在角色卡「擲骰設定」改的內容不會被蓋掉。
    欄位與領域卡的設定相同（見 domain-card-fx.js）：
      target = damage（加到傷害）| check（加到檢定）| standalone（獨立傷害）
-     formula、scaleProf、perUnit、unitDiceOnly、unitSpellcast、unitLabel、unitMax、condLabel / condFormula
-   replaces = 這個特性的效果取代另一個特性（填特性名稱）。升級後同一個效果變強時使用，
-              兩個特性都在角色身上時，只有新的會出現在擲骰器。
+     formula、scaleProf、perUnit、unitDiceOnly、unitSpellcast、unitLabel、condLabel / condFormula
+   升級後變強的特性（例如神恩之力之於輝光羽翼）兩個都在身上時，擲骰器兩個都會列出，由玩家勾新的那個。
    這裡只收錄公式明確、不需要額外判斷的特性；是否滿足發動條件（例如「成功攻擊時」「恐懼成功時」）
    由玩家在擲骰時自己決定要不要勾選。 */
 const TRAIT_FX = {
   // ----- 子職：翼哨（花費 1 希望點，成功攻擊時額外傷害；神恩之力升級後 1d8 變 1d12）-----
   '輝光羽翼': { target: 'damage', formula: '1d8' },
-  '神恩之力': { target: 'damage', formula: '1d12', replaces: '輝光羽翼' },
+  '神恩之力': { target: 'damage', formula: '1d12' }, // 升級版輝光羽翼：兩個都在身上時，擲骰器兩個都會列出，只勾這個
 
   // ----- 子職：戰爭學派（攻擊檢定恐懼成功時額外魔法傷害，逐級變強）-----
   '直面恐懼': { target: 'damage', formula: '1d10' },
-  '懼為己有': { target: 'damage', formula: '2d10', replaces: '直面恐懼' },
-  '無所畏懼': { target: 'damage', formula: '3d10', replaces: '懼為己有' },
+  '懼為己有': { target: 'damage', formula: '2d10' },
+  '無所畏懼': { target: 'damage', formula: '3d10' },
 
   // ----- 子職：其他 -----
   '詩人之心': { target: 'check', formula: 'd4' }, // 說書人：花費 1 希望點，說服、打動類的動作檢定 +d4

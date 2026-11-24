@@ -28,8 +28,20 @@ const Roller = (() => {
   }
 
   /* ---------- 收集要擲的項目 ---------- */
+  // 公式裡的屬性名稱（例如「1d6+力量」）換成角色目前的屬性值（變身時含野獸型態加值）
+  const ATTR_RE = new RegExp(`([+\\-＋－−]?)\\s*(${ATTRS.map((a) => a.label).join('|')})`, 'g');
+  function resolveFormula(formula) {
+    const c = ch();
+    const out = String(formula == null ? '' : formula).replace(ATTR_RE, (_, sign, label) => {
+      const a = ATTRS.find((x) => x.label === label);
+      const v = (/[-－−]/.test(sign) ? -1 : 1) * attrValue(c, a.key);
+      return (v < 0 ? '-' : '+') + Math.abs(v);
+    });
+    return out.trim().replace(/^\+/, '');
+  }
+
   function parseOrErr(formula, label, errors) {
-    const r = Dice.parse(formula);
+    const r = Dice.parse(resolveFormula(formula));
     if (!r.ok) {
       errors.push(`${label} 的公式格式錯誤：${formula}`);
       return null;
@@ -38,14 +50,10 @@ const Roller = (() => {
   }
 
   // 擲骰時可用的效果來源：有擲骰設定的角色特性（id 't0'…）與已準備的領域卡（id 'c0'…）。
-  // 特性的設定寫了「取代」另一個特性時，被取代的特性不列出（例如神恩之力取代輝光羽翼）。
   // 回傳 [{ card, i }]：card 是特性或領域卡本身（都有 name 與 fx），i 是狀態用的 id。
   function preparedCards(target) {
     const c = ch();
-    const replaced = new Set(c.traits.filter((t) => t.fx.target !== 'none' && t.fx.replaces).map((t) => t.fx.replaces.trim()));
-    const traits = c.traits
-      .map((card, i) => ({ card, i: 't' + i }))
-      .filter(({ card }) => card.fx.target === target && !replaced.has(String(card.name).trim()));
+    const traits = c.traits.map((card, i) => ({ card, i: 't' + i })).filter(({ card }) => card.fx.target === target);
     const cards = c.domainCards.map((card, i) => ({ card, i: 'c' + i })).filter(({ card }) => card.prepared && card.fx.target === target);
     return [...traits, ...cards];
   }
@@ -65,14 +73,23 @@ const Roller = (() => {
     return attr ? { label: attr.label, value: Number(c.attrs[attr.key].value) || 0 } : null;
   }
 
-  // 依消耗資源決定次數的卡（fx.perUnit）：目前填的 N，至少 1，有設上限就不超過上限。
+  // 倍數「× 階級」：'dice' 只乘第一組骰子，'all' 整個公式
+  const tierNow = () => tierOfLevel(Number(ch().level) || 1);
+  function scaleByTier(terms, card) {
+    if (card.fx.scaleTier === 'dice') return Dice.scaleFirstDice(terms, tierNow());
+    if (card.fx.scaleTier === 'all') return Dice.multiply(terms, tierNow());
+    return terms;
+  }
+
+  // 公式旁的倍數說明
+  const fxTag = (f) =>
+    `${f.scaleProf ? '（×熟練值）' : ''}${f.scaleTier ? `（${f.scaleTier === 'dice' ? '骰子' : ''}×階級 ${tierNow()}）` : ''}${f.perUnit ? '（每單位）' : ''}`;
+
+  // 依消耗資源決定次數的卡（fx.perUnit）：目前填的 N，至少 1。
   // 還沒填過 N、而且卡片設定為「預設帶入施法屬性值」時，N 先用施法屬性值。
   function unitCount(st, i, card) {
     const auto = card.fx.unitSpellcast ? spellcastInfo(card) : null;
-    let n = Math.max(1, Math.floor(Number(st.units[i]) || (auto ? auto.value : 1)));
-    const max = Math.floor(Number(card.fx.unitMax) || 0);
-    if (max > 0) n = Math.min(n, max);
-    return n;
+    return Math.max(1, Math.floor(Number(st.units[i]) || (auto ? auto.value : 1)));
   }
 
   // 公式乘以 N（unitDiceOnly 時只乘第一組骰子）；骰子總數超過上限時回報錯誤
@@ -88,14 +105,13 @@ const Roller = (() => {
   }
 
   const unitInput = (st, i, card) => {
-    const max = Math.floor(Number(card.fx.unitMax) || 0);
     const auto = card.fx.unitSpellcast ? spellcastInfo(card) : null;
     const hint = card.fx.unitSpellcast
       ? auto
         ? `<em class="unit-auto" title="自動帶入：施法屬性 ${esc(auto.label)} = ${auto.value}（可自行修改）">（${esc(auto.label)} ${auto.value}）</em>`
         : `<em class="unit-auto" title="找不到施法屬性：請先在表頭選好子職業，或子職業沒有施法屬性">（無施法屬性）</em>`
       : '';
-    return `<span class="unit"><span>${esc(card.fx.unitLabel || '次數')}</span>×<input type="number" min="1" ${max > 0 ? `max="${max}"` : ''} value="${unitCount(st, i, card)}" data-act="unit" data-i="${i}" aria-label="${esc(card.fx.unitLabel || '次數')}">${hint}</span>`;
+    return `<span class="unit"><span>${esc(card.fx.unitLabel || '次數')}</span>×<input type="number" min="1" value="${unitCount(st, i, card)}" data-act="unit" data-i="${i}" aria-label="${esc(card.fx.unitLabel || '次數')}">${hint}</span>`;
   };
 
   function cardItems(target, st, errors) {
@@ -107,6 +123,7 @@ const Roller = (() => {
       let terms = parseOrErr(card.fx.formula, name, errors);
       if (terms && terms.length) {
         if (card.fx.scaleProf) terms = Dice.scaleFirstDice(terms, prof);
+        terms = scaleByTier(terms, card);
         let label = name;
         if (card.fx.perUnit) {
           const n = unitCount(st, i, card);
@@ -142,7 +159,9 @@ const Roller = (() => {
     }
     // 優勢：每個優勢擲一顆 d6，有好幾個優勢時全部一起擲、只取最高的加上去
     const beastAdv = st.beastAdv && currentBeast(c) ? 1 : 0; // 野獸型態的優勢行動：多 1 個優勢
-    const advN = Math.max(0, Math.min(9, (Math.floor(Number(st.adv)) || 0) + beastAdv));
+    // 擲骰設定為「檢定優勢」的領域卡與角色特性：勾一個多 1 個優勢
+    const advSrc = preparedCards('advantage').filter(({ i }) => st.cards[i]).length;
+    const advN = Math.max(0, Math.min(9, (Math.floor(Number(st.adv)) || 0) + beastAdv + advSrc));
     if (advN) {
       const die = { kind: 'dice', sign: 1, count: advN, sides: 6 };
       if (advN > 1) die.keep = { mode: 'h', n: 1 };
@@ -261,13 +280,17 @@ const Roller = (() => {
   }
 
   function cardRows(target, st) {
-    const rows = preparedCards(target);
+    // 檢定時，「檢定優勢」的來源也列在這裡（勾選 = 優勢 +1）
+    const rows = target === 'check' ? [...preparedCards('check'), ...preparedCards('advantage')] : preparedCards(target);
     if (!rows.length) return '<p class="muted">沒有可用的領域卡或角色特性（到角色卡設定領域卡的「準備」，以及領域卡或角色特性的「擲骰設定」）</p>';
     return rows
       .map(({ card, i }) => {
         const f = card.fx;
+        if (f.target === 'advantage') {
+          return optionRow(`<span>${esc(card.name || '領域卡')}</span><code>+1 優勢</code>`, !!st.cards[i], `data-act="card" data-i="${i}"`);
+        }
         let h = optionRow(
-          `<span>${esc(card.name || '領域卡')}</span><code>${esc(f.formula || '—')}${f.scaleProf ? '（×熟練值）' : ''}${f.perUnit ? '（每單位）' : ''}</code>${f.perUnit ? unitInput(st, i, card) : ''}`,
+          `<span>${esc(card.name || '領域卡')}</span><code>${esc(f.formula || '—')}${fxTag(f)}</code>${f.perUnit ? unitInput(st, i, card) : ''}`,
           !!st.cards[i],
           `data-act="card" data-i="${i}"`
         );
@@ -349,7 +372,7 @@ const Roller = (() => {
               ? optionRow(`<span>＋ ${esc(f.condLabel || '條件成立')}</span><code>+${esc(f.condFormula)}</code>`, !!st.spellCond[i], `data-act="spellCond" data-i="${i}"`)
               : '';
             return `<div class="spell"><div class="spell-head"><b>${esc(card.name || '法術')}</b>
-              <code>${esc(f.formula)}${f.scaleProf ? '（×熟練值）' : ''}${f.perUnit ? '（每單位）' : ''}</code>${f.perUnit ? unitInput(st, i, card) : ''}
+              <code>${esc(f.formula)}${fxTag(f)}</code>${f.perUnit ? unitInput(st, i, card) : ''}
               <button type="button" class="mini-roll" data-act="spell" data-i="${i}">擲</button></div>${cond}</div>`;
           })
           .join('')
@@ -468,6 +491,7 @@ const Roller = (() => {
     let t = parseOrErr(card.fx.formula, card.name || '法術', errors);
     if (t && t.length) {
       if (card.fx.scaleProf) t = Dice.scaleFirstDice(t, prof);
+      t = scaleByTier(t, card);
       let label = card.name || '法術';
       if (card.fx.perUnit) {
         const n = unitCount(st, i, card);

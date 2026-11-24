@@ -180,7 +180,7 @@ const Sheet = (() => {
   }
 
   // 擲骰設定（領域卡與角色特性共用）。p 是資料路徑前綴，例如 domainCards.3 或 traits.2
-  function fxBlock(p, fx, withReplaces = false) {
+  function fxBlock(p, fx) {
     const target = EFFECT_TARGETS.find((t) => t.value === fx.target);
     const badge = fx.target !== 'none' ? `<em class="badge">${esc(target ? target.label : '')}</em>` : '';
     const opts = EFFECT_TARGETS.map(
@@ -190,16 +190,13 @@ const Sheet = (() => {
         <summary>擲骰設定 ${badge}</summary>
         <div class="fx-grid">
           <label>作用<select data-bind="${p}.fx.target">${opts}</select></label>
-          <label>公式<input type="text" data-bind="${p}.fx.formula" value="${esc(fx.formula)}" placeholder="例：d8+2 或 d12"></label>
-          <label class="inline">${check(p + '.fx.scaleProf')} 第一組骰子的數量乘以熟練值</label>
-          <label class="inline">${check(p + '.fx.perUnit')} 依消耗的資源決定次數：公式乘以 N，N 在擲骰時填</label>
-          <label class="inline">${check(p + '.fx.unitDiceOnly')} 只乘第一組骰子（固定加值只算一次，例如 d8+6 變成 Nd8+6）</label>
-          <label class="inline">${check(p + '.fx.unitSpellcast')} N 預設帶入施法屬性值（依子職業的施法屬性，擲骰時仍可修改）</label>
-          <label>資源名稱（選填）<input type="text" data-bind="${p}.fx.unitLabel" value="${esc(fx.unitLabel)}" placeholder="例：標記的壓力點"></label>
-          <label>N 的上限（選填，0 為不限）${num(p + '.fx.unitMax', 'min="0"')}</label>
+          <label>公式<input type="text" data-bind="${p}.fx.formula" value="${esc(fx.formula)}" placeholder="例：d8+2、d12、力量、1d6+力量" title="可以寫屬性名稱（敏捷、力量、技巧、直覺、風采、知識），擲骰時帶入角色的屬性值"></label>
+          <label>倍數<select data-fxmode="${p}" title="N 是擲骰時填的資源量，例如標記的壓力點、花費的指示物">${FX_MODES.map(
+            (m) => `<option value="${m.value}" ${fxMode(fx) === m.value ? 'selected' : ''}>${m.label}</option>`
+          ).join('')}</select></label>
+          <label>資源名稱（倍數用 N 時，選填）<input type="text" data-bind="${p}.fx.unitLabel" value="${esc(fx.unitLabel)}" placeholder="例：標記的壓力點"></label>
           <label>條件說明<input type="text" data-bind="${p}.fx.condLabel" value="${esc(fx.condLabel)}" placeholder="例：目標處於脆弱"></label>
           <label>條件成立時追加<input type="text" data-bind="${p}.fx.condFormula" value="${esc(fx.condFormula)}" placeholder="例：1d8"></label>
-          ${withReplaces ? `<label class="wide">取代另一個特性（選填）<input type="text" data-bind="${p}.fx.replaces" value="${esc(fx.replaces)}" placeholder="特性名稱，例：輝光羽翼。兩個都在身上時，擲骰器只列出這一個"></label>` : ''}
         </div>
       </details>`;
   }
@@ -603,7 +600,7 @@ const Sheet = (() => {
             ${area(`traits.${i}.desc`, 2, '描述')}
             <button type="button" class="x" data-del="traits.${i}" aria-label="刪除">✕</button>
           </div>
-          ${fxBlock(`traits.${i}`, t.fx, true)}
+          ${fxBlock(`traits.${i}`, t.fx)}
         </div>`
       )
       .join('');
@@ -808,6 +805,15 @@ const Sheet = (() => {
       c.companion.evasionAdj = v - (companionEvasion(c) - (Number(c.companion.evasionAdj) || 0));
       Store.save();
       el.title = companionEvasionTitle(c);
+      return;
+    }
+
+    // 擲骰設定的「倍數」：一次設定四個欄位
+    if (el.dataset && el.dataset.fxmode) {
+      const fx = getPath(ch(), `${el.dataset.fxmode}.fx`);
+      if (!fx) return;
+      setFxMode(fx, el.value);
+      Store.save();
       return;
     }
 
