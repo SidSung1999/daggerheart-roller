@@ -146,7 +146,11 @@ const GsImport = (() => {
       if (![2, 3, 4].includes(tier) || !key || !optionsOfTier(tier).some((o) => o.key === key)) {
         return warn(`升級紀錄看不懂，已略過：階級 ${text(cells[0])}、選項「${text(cells[1])}」（階級要填 2、3、4；選項可用：屬性、HP上限、壓力上限、經歷、領域卡、閃避、升級子職業、熟練值、兼職，其中升級子職業、熟練值、兼職只有階級 3、4）`);
       }
-      c.upgrades[upKey(tier)][key] = num(cells[2], 1);
+      // 熟練值、兼職在角色卡上一次佔 2 格，表單常填「勾了幾格」（2）而不是「選了幾次」（1）；
+      // 這兩項每階級最多選 1 次，所以填 1 或 2 都當成選過 1 次。其他選項超過上限時以上限計。
+      const opt = UPGRADE_OPTIONS.find((o) => o.key === key);
+      const n = Math.max(0, Math.floor(num(cells[2], 1)));
+      c.upgrades[upKey(tier)][key] = opt.width === 2 ? (n > 0 ? 1 : 0) : Math.min(n, opt.cap);
     });
 
     /* 3. 屬性 */
