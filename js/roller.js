@@ -255,7 +255,8 @@ const Roller = (() => {
     } else {
       const t = parseOrErr(w.damage, w.name || `${src.slot}武器`, errors);
       if (t && t.length) {
-        items.push({ label: w.name || `${src.slot}武器`, terms: Dice.scaleFirstDice(t, prof) });
+        // 武器的每一組骰子都乘以熟練值（例如鬥士打擊 d8+d6 → 熟練值 2 時 2d8+2d6），固定加值不乘
+        items.push({ label: w.name || `${src.slot}武器`, terms: Dice.scaleAllDice(t, prof) });
       }
     }
     items.push(...cardItems('damage', st, errors), ...extraItem(st, errors));

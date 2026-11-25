@@ -79,6 +79,12 @@ const Dice = (() => {
     });
   }
 
+  // 所有正的骰子項的數量都乘以 mult：武器傷害用，例如 d8+d6 在熟練值 2 時為 2d8+2d6（固定加值不乘）
+  function scaleAllDice(terms, mult) {
+    const k = Math.max(1, Math.floor(mult) || 1);
+    return terms.map((t) => (t.kind === 'dice' && t.sign > 0 ? { ...t, count: Math.min(t.count * k, MAX_COUNT) } : t));
+  }
+
   // 擲一組項目，回傳總和與說明文字
   function rollTerms(terms, rng = roll) {
     let total = 0;
@@ -107,7 +113,7 @@ const Dice = (() => {
     return { total, text: pieces.join('　') };
   }
 
-  return { roll, parse, format, scaleFirstDice, multiply, rollTerms, MAX_COUNT };
+  return { roll, parse, format, scaleFirstDice, scaleAllDice, multiply, rollTerms, MAX_COUNT };
 })();
 
 if (typeof module !== 'undefined') module.exports = Dice;

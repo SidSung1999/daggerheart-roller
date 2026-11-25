@@ -12,7 +12,8 @@ const ATTRS = [
 const MAX_PREPARED = 5;
 
 // 武器清單 WEAPONS 在 js/weapons.js、護甲清單 ARMORS 在 js/armors.js（由 CSV 自動產生）。
-// 武器 damage 的骰數代表「乘以熟練值」，例如 d8+4 在熟練值 3 時為 3d8+4。
+// 武器 damage 的骰數代表「乘以熟練值」，例如 d8+4 在熟練值 3 時為 3d8+4；
+// 有多組骰子時每一組都乘，例如 d8+d6 在熟練值 2 時為 2d8+2d6（見 roller.js collectDamage）。
 
 const EFFECT_TARGETS = [
   { value: 'none', label: '無（僅記錄）' },
